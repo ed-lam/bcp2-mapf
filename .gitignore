@@ -1,0 +1,7 @@
+.idea/
+.vscode/
+build/
+outputs/
+tracy/
+*.sh
+**/.DS_Store
