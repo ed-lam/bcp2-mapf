@@ -1,9 +1,9 @@
 BCP2-MAPF
 =========
 
-BCP2-MAPF is an implementation of a branch-and-cut-and-price algorithm for the multi-agent path finding problem. It is the second version of the earlier [BCP-MAPF](https://github.com/ed-lam/bcp-mapf) code. BCP2-MAPF is described in the following preprint:
+BCP2-MAPF is an implementation of a branch-and-cut-and-price algorithm for the multi-agent path finding problem. It is the second version of the earlier [BCP-MAPF](https://github.com/ed-lam/bcp-mapf) code. BCP2-MAPF is described in the following paper:
 
-[Low-Level Search on Time Intervals in Branch-and-Cut-and-Price for Multi-Agent Path Finding](https://ed-lam.com/papers/bcp2mapf2025_preprint.pdf). Edward Lam and Peter J. Stuckey. 2025.
+[Low-Level Search on Time Intervals in Branch-and-Cut-and-Price for Multi-Agent Path Finding](https://ed-lam.com/papers/bcp2mapf2025.pdf). Edward Lam and Peter J. Stuckey. International Symposium on Combinatorial Search. 2025.
 
 Please cite this article if you use this code for the multi-agent path finding problem or as a template for other branch-and-cut-and-price codes.
 
