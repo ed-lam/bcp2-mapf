@@ -133,6 +133,7 @@ class Problem
 
     // Getters
     const auto& instance() const { return instance_; }
+    auto iter() const { return iter_; }
     auto& bbtree() { return bbtree_; }
     auto& master() { return master_; }
     auto& pricer() { return pricer_; }
