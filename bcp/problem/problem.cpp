@@ -211,7 +211,8 @@ void Problem::solve(const Float time_limit)
                 if (master_.status() != MasterProblemStatus::Infeasible && !master_.vars_added())
                 {
                     // Create cuts.
-                    std::apply([](auto&... separator) { return (separator.run(), ...); }, lazy_constraints_.subroutines);
+                    std::apply([](auto&... separator) { return (separator.run(), ...); },
+                               lazy_constraints_.subroutines);
 
                     // Store the result if the LP is integer feasible.
                     if (master_.status() == MasterProblemStatus::Integer && !master_.constrs_added())
