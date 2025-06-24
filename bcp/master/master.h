@@ -143,6 +143,7 @@ class MasterProblem
 
     // Debug
     void print_paths() const;
+    void print_dual_sol() const;
 #ifdef DEBUG
     Float calculate_reduced_cost(const Agent a, const Path& path);
     void set_verbose(const Bool verbose = true) { lp_.set_verbose(verbose); }

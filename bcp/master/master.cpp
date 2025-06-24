@@ -509,16 +509,7 @@ void MasterProblem::solve()
 
     // Print dual solution.
 #ifdef PRINT_DEBUG
-    println("Dual solution:");
-    for (const auto& constraint : all_constraints())
-    {
-        const auto dual = lp_.get_dual_sol(constraint.row());
-        if (is_ne(dual, 0.0))
-        {
-            const auto name = constraint.name();
-            println("    {}: {:.6f}", name, dual);
-        }
-    }
+    print_dual_sol();
 #endif
 
     // Reset the counter of variables and constraints added since the last time that the master problem is solved.
@@ -967,6 +958,20 @@ void MasterProblem::print_paths() const
                 println("");
             }
         }
+}
+
+void MasterProblem::print_dual_sol() const
+{
+    println("Dual solution:");
+    for (const auto& constraint : all_constraints())
+    {
+        const auto dual = constraint_dual_sol(constraint);
+        if (is_ne(dual, 0.0))
+        {
+            const auto& name = constraint.name();
+            println("    {}: {:.6f}", name, dual);
+        }
+    }
 }
 
 #ifdef DEBUG
