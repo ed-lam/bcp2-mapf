@@ -26,7 +26,6 @@ void AgentSeparator::separate()
     for (Agent a = 0; a < A; ++a)
     {
         create_row(a);
-        ++num_added_;
     }
 }
 
@@ -56,6 +55,7 @@ void AgentSeparator::create_row(const Agent a)
                  reinterpret_cast<std::uintptr_t>(constraint->data()));
     constraint->a = a;
     master.add_convexity_row(std::move(constraint));
+    ++num_added_;
 }
 
 void AgentSeparator::add_pricing_costs(const Constraint& constraint, const Float dual)

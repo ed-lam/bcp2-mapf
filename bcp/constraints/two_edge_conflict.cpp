@@ -169,7 +169,6 @@ void TwoEdgeConflictSeparator::separate()
         {
             // Create the row.
             create_row(candidate);
-            ++num_added_;
             ++num_separated;
 
             // Exit if enough cuts are found.
@@ -234,6 +233,7 @@ void TwoEdgeConflictSeparator::create_row(const TwoEdgeConstraintCandidate& cand
     constraint->a1_es = a1_es;
     constraint->a2_es = a2_es;
     master.add_row(std::move(constraint));
+    ++num_added_;
 }
 
 void TwoEdgeConflictSeparator::add_pricing_costs(const Constraint& constraint, const Float dual)

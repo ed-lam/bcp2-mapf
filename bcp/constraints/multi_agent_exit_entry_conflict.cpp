@@ -120,7 +120,6 @@ void MultiAgentExitEntryConflictSeparator::separate()
         {
             // Create the row.
             create_row(candidate);
-            ++num_added_;
             ++num_separated;
 
             // Exit if enough cuts are found.
@@ -262,6 +261,7 @@ void MultiAgentExitEntryConflictSeparator::create_row(const MultiAgentExitEntryC
     constraint->num_other_es = num_other_es;
     std::copy(other_es, other_es + num_other_es, constraint->other_es);
     master.add_row(std::move(constraint));
+    ++num_added_;
 }
 
 void MultiAgentExitEntryConflictSeparator::add_pricing_costs(const Constraint& constraint, const Float dual)

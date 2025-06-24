@@ -71,7 +71,6 @@ void EdgeTimeConflictSeparator::separate()
 
         // Create the row.
         create_row(et1.t, et1.et.e, et2.et.e, et3.et.e);
-        ++num_added_;
     }
 }
 
@@ -103,6 +102,7 @@ void EdgeTimeConflictSeparator::create_row(const Time t, const Edge e1, const Ed
     constraint->e2 = e2;
     constraint->e3 = e3;
     master.add_row(std::move(constraint));
+    ++num_added_;
 }
 
 void EdgeTimeConflictSeparator::add_pricing_costs(const Constraint& constraint, const Float dual)

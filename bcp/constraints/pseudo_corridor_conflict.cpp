@@ -120,7 +120,6 @@ void PseudoCorridorConflictSeparator::separate()
         {
             // Create the row.
             create_row(candidate);
-            ++num_added_;
             ++num_separated;
 
             // Exit if enough cuts are found.
@@ -184,6 +183,7 @@ void PseudoCorridorConflictSeparator::create_row(const PseudoCorridorConstraintC
     constraint->a1_ets = a1_ets;
     constraint->a2_ets = a2_ets;
     master.add_row(std::move(constraint));
+    ++num_added_;
 }
 
 void PseudoCorridorConflictSeparator::add_pricing_costs(const Constraint& constraint, const Float dual)

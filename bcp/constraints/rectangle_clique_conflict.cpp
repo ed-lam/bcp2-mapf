@@ -506,7 +506,6 @@ void RectangleCliqueConflictSeparator::separate()
             create_row(a1, a2,
                        a1_first_entry, a1_first_exit, a1_length, a1_n_increment,
                        a2_first_entry, a2_first_exit, a2_length, a2_n_increment);
-            ++num_added_;
             ++num_separated;
 
             // Exit if enough cuts are found.
@@ -594,6 +593,7 @@ void RectangleCliqueConflictSeparator::create_row(const Agent a1,
     constraint->a2_length = a2_length;
     constraint->a2_n_increment = a2_n_increment;
     master.add_row(std::move(constraint));
+    ++num_added_;
 }
 
 void RectangleCliqueConflictSeparator::add_pricing_costs(const Constraint& constraint, const Float dual)

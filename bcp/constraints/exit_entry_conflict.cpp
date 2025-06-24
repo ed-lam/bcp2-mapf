@@ -102,7 +102,6 @@ void ExitEntryConflictSeparator::separate()
         {
             // Create the row.
             create_row(candidate);
-            ++num_added_;
             ++num_separated;
 
             // Exit if enough cuts are found.
@@ -250,6 +249,7 @@ void ExitEntryConflictSeparator::create_row(const ExitEntryConstraintCandidate& 
     constraint->num_a2_es = num_a2_es;
     std::copy(a2_es, a2_es + num_a2_es, constraint->a2_es);
     master.add_row(std::move(constraint));
+    ++num_added_;
 }
 
 void ExitEntryConflictSeparator::add_pricing_costs(const Constraint& constraint, const Float dual)

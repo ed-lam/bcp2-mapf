@@ -183,7 +183,6 @@ void MultiAgentTwoEdgeConflictSeparator::separate()
         {
             // Create the row.
             create_row(candidate);
-            ++num_added_;
             ++num_separated;
 
             // Exit if enough cuts are found.
@@ -248,6 +247,7 @@ void MultiAgentTwoEdgeConflictSeparator::create_row(const MultiAgentTwoEdgeConst
     constraint->canonical_es = canonical_es;
     constraint->other_es = other_es;
     master.add_row(std::move(constraint));
+    ++num_added_;
 }
 
 void MultiAgentTwoEdgeConflictSeparator::add_pricing_costs(const Constraint& constraint, const Float dual)

@@ -57,7 +57,6 @@ void NodeTimeConflictSeparator::separate()
 
         // Create the row.
         create_row(nt);
-        ++num_added_;
     }
 }
 
@@ -84,6 +83,7 @@ void NodeTimeConflictSeparator::create_row(const NodeTime nt)
                  reinterpret_cast<std::uintptr_t>(constraint->data()));
     constraint->nt = nt;
     master.add_row(std::move(constraint));
+    ++num_added_;
 }
 
 void NodeTimeConflictSeparator::add_pricing_costs(const Constraint& constraint, const Float dual)

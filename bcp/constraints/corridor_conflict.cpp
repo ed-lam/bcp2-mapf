@@ -202,7 +202,6 @@ void CorridorConflictSeparator::separate()
         {
             // Create the row.
             create_row(candidate);
-            ++num_added_;
             ++num_separated;
 
             // Exit if enough cuts are found.
@@ -305,6 +304,7 @@ void CorridorConflictSeparator::create_row(const CorridorConstraintCandidate& ca
     constraint->a1_earliest_arrival = a1_earliest_arrival;
     constraint->a2_earliest_arrival = a2_earliest_arrival;
     master.add_row(std::move(constraint));
+    ++num_added_;
 }
 
 void CorridorConflictSeparator::add_pricing_costs(const Constraint& constraint, const Float dual)

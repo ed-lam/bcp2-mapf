@@ -121,7 +121,6 @@ void TargetConflictSeparator::separate()
         {
             // Create the row.
             create_row(candidate);
-            ++num_added_;
             ++num_separated;
 
             // Exit if enough cuts are found.
@@ -169,6 +168,7 @@ void TargetConflictSeparator::create_row(const TargetConstraintCandidate& candid
     constraint->crossing_agent = crossing_agent;
     constraint->nt = nt;
     master.add_row(std::move(constraint));
+    ++num_added_;
 }
 
 void TargetConflictSeparator::add_pricing_costs(const Constraint& constraint, const Float dual)

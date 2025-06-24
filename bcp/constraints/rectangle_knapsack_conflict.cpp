@@ -465,7 +465,6 @@ void RectangleKnapsackConflictSeparator::separate()
                                     // Create the row.
                                     create_row(a1, a2, a1_start, a2_start, a1_end, a2_end, num_a1_ets, num_a2_ets,
                                                rectangle);
-                                    ++num_added_;
 
                                     // Exit if enough cuts are found.
                                     ++num_separated_this_run;
@@ -527,6 +526,7 @@ void RectangleKnapsackConflictSeparator::create_row(const Agent a1,
     constraint->num_ets = num_ets;
     std::copy(rectangle.begin(), rectangle.end(), constraint->ets);
     master.add_row(std::move(constraint));
+    ++num_added_;
 }
 
 void RectangleKnapsackConflictSeparator::add_pricing_costs(const Constraint& constraint, const Float dual)
