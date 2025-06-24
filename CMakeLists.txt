@@ -81,7 +81,7 @@ message("Found Gurobi at ${GUROBI_LIBRARY} and ${GUROBI_INCLUDE_DIR}")
 # if (NOT BOOST_INCLUDE_DIR)
 
     # Download boost if not found.
-    set(BOOST_VERSION 1.87.0)
+    set(BOOST_VERSION 1.88.0)
     message(STATUS "Downloading Boost libraries")
     include(FetchContent)
     # Set(FETCHCONTENT_QUIET FALSE)
