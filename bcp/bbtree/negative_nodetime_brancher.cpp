@@ -209,3 +209,14 @@ void NegativeNodeTimeBrancher::disable_vars(const BrancherData* const data)
     }
     debugln("");
 }
+
+void NegativeNodeTimeBrancher::print(const BrancherData* const data) const
+{
+    // Get the constraint data.
+    const auto& [a, nt] = *static_cast<const NegativeNodeTimeBrancherData*>(data);
+
+    // Print.
+    println("    Agent {} forbidding {}",
+            a,
+            format_nodetime(nt, instance_.map));
+}

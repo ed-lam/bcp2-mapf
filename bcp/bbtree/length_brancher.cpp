@@ -197,7 +197,7 @@ void LengthBrancher::disable_vars(const BrancherData* const data)
     debugln("Length brancher disabling paths incompatible with decision on agent {} finishing at or {} time {} in B&B "
             "node {}:",
             finish_a,
-            dir == BranchDirection::Down ? "before" : "later than",
+            dir == BranchDirection::Down ? "before" : "after",
             nt.t,
             problem_.bbtree().current_id());
     if (dir == BranchDirection::Down)
@@ -230,4 +230,16 @@ void LengthBrancher::disable_vars(const BrancherData* const data)
         }
     }
     debugln("");
+}
+
+void LengthBrancher::print(const BrancherData* const data) const
+{
+    // Get the constraint data.
+    const auto& [finish_a, nt, dir] = *static_cast<const LengthBrancherData*>(data);
+
+    // Print.
+    println("    Agent {} finishing at or {} time {}",
+            finish_a,
+            dir == BranchDirection::Down ? "before" : "after",
+            nt.t);
 }

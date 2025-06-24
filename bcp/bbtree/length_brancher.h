@@ -34,4 +34,7 @@ class LengthBrancher : public Brancher
 
     // Disable existing incompatible paths in the master problem
     void disable_vars(const BrancherData* const data);
+
+    // Print
+    void print(const BrancherData* const data) const;
 };

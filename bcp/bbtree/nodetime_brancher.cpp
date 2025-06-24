@@ -402,3 +402,15 @@ void NodeTimeBrancher::disable_vars(const BrancherData* const data)
     }
     debugln("");
 }
+
+void NodeTimeBrancher::print(const BrancherData* const data) const
+{
+    // Get the constraint data.
+    const auto& [a, nt, dir] = *static_cast<const NodeTimeBrancherData*>(data);
+
+    // Print.
+    println("    Agent {} {} {}",
+            a,
+            (dir == BranchDirection::Up ? "requiring" : "forbidding"),
+            format_nodetime(nt, instance_.map));
+}

@@ -72,4 +72,7 @@ class Brancher
 
     // Disable existing incompatible paths in the master problem
     virtual void disable_vars(const BrancherData* const data) = 0;
+
+    // Debug
+    virtual void print(const BrancherData* const data) const = 0;
 };
