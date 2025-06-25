@@ -9,7 +9,6 @@ Author: Edward Lam <ed@ed-lam.com>
 
 #include "constraints/separator.h"
 #include "master/constraint.h"
-#include "types/array.h"
 #include "types/matrix.h"
 #include "types/tuple.h"
 #include "types/vector.h"
