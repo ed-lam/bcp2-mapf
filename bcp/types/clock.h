@@ -27,6 +27,7 @@ class Clock
         Timer& operator=(const Timer&) = delete;
         Timer& operator=(Timer&&) = delete;
     };
+    friend class Timer;
 
     Float time_limit_ = std::numeric_limits<Float>::infinity();
     std::clock_t start_time_ = null_time();
@@ -56,15 +57,16 @@ class Clock
         const auto duration = static_cast<Float>(current_time - start_time_) / CLOCKS_PER_SEC;
         return duration;
     }
-    void accumulate_elapsed_time()
-    {
-        total_duration_ += elapsed_time();
-        start_time_ = null_time();
-    }
     auto time_remaining() const { return time_limit_ - elapsed_time(); }
     auto timed_out() const { return time_remaining() < 0.0; }
     auto total_duration() const { return total_duration_; }
 
   protected:
+    // Internal functions
     static std::clock_t null_time() { return static_cast<std::clock_t>(-1); }
+    void accumulate_elapsed_time()
+    {
+        total_duration_ += elapsed_time();
+        start_time_ = null_time();
+    }
 };
