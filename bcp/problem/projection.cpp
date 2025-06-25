@@ -27,14 +27,17 @@ Projection::Projection(const Instance& instance, Problem& problem) :
     summed_nodetimes_(),
     summed_undirected_edgetimes_(),
 
-    agent_node_finish_(),
-    node_finish_(),
+    pair_target_crossing_vals_(),
+    latest_target_crossing_times_(instance_.agents.size()),
+    target_finishing_(),
+    agent_target_finishing_(),
+    agent_target_crossing_(),
 
     memory_pool_(),
     zeros_(nullptr),
     list_fractional_nodetimes_(),
     list_fractional_edgetimes_(),
-    list_node_finish_()
+    list_target_finish_()
 {
     ZoneScopedC(TRACY_COLOUR);
 
@@ -42,17 +45,17 @@ Projection::Projection(const Instance& instance, Problem& problem) :
     const Agent A = instance_.agents.size();
     for (Agent a = 0; a < A; ++a)
     {
-        const auto n = instance_.agents[a].target;
-        agent_node_finish_[{a, n}];
+        const auto target = instance_.agents[a].target;
+        agent_target_finishing_[{a, target}];
     }
     for (Agent a = 0; a < A; ++a)
     {
-        const auto n = instance_.agents[a].target;
-        auto& [agent, values] = node_finish_[n];
+        const auto target = instance_.agents[a].target;
+        auto& [agent, finish_times] = target_finishing_[target];
         agent = a;
-        values = &agent_node_finish_.at({a, n});
+        finish_times = &agent_target_finishing_.at({a, target});
 
-        list_node_finish_[n];
+        list_target_finish_[target];
     }
 }
 
@@ -84,16 +87,18 @@ void Projection::clear()
     }
     summed_nodetimes_.clear();
     summed_undirected_edgetimes_.clear();
-    for (auto& [_, finish_sums] : agent_node_finish_)
+    // target_finishing_ stores pointers to agent_target_finishing_ in the initialisation, so no need to clear.
+    for (auto& [_, finish_times] : agent_target_finishing_)
     {
-        finish_sums.resize(1);
-        debug_assert(finish_sums[0] == 0.0);
+        finish_times.resize(1);
+        debug_assert(finish_times[0] == 0.0);
     }
+    agent_target_crossing_.clear();
     memory_pool_.reset(sizeof(Float) * (A + 1));
     zeros_ = static_cast<ProjectionValues*>(memory_pool_.get_buffer<true, true>());
     list_fractional_nodetimes_.clear();
     list_fractional_edgetimes_.clear();
-    // No need to clear list_node_finish_ because it is overwritten.
+    // No need to clear list_target_finish_ because it is overwritten.
 }
 
 void Projection::compute()
@@ -108,6 +113,7 @@ void Projection::compute()
         ZoneScopedNC("Compute projection A", TRACY_COLOUR);
 
         // Calculate solution on the nodetimes and edgetimes from the paths.
+        pair_target_crossing_vals_.clear();
         for (Agent a = 0; a < A; ++a)
         {
             // Sum values from every path.
@@ -118,6 +124,7 @@ void Projection::compute()
                 {
                     const auto& path = variable.path();
 
+                    std::fill(latest_target_crossing_times_.begin(), latest_target_crossing_times_.end(), -1);
                     Time t = 0;
                     for (; t < path.size() - 1; ++t)
                     {
@@ -126,6 +133,13 @@ void Projection::compute()
 
                         agent_nodetimes_[a][nt] += val;
                         agent_edgetimes_[a][et] += val;
+
+                        if (const auto it = target_finishing_.find(nt.n); it != target_finishing_.end())
+                        {
+                            const auto finishing_agent = it->second.first;
+                            latest_target_crossing_times_[finishing_agent] =
+                                std::max(latest_target_crossing_times_[finishing_agent], t);
+                        }
                     }
                     {
                         const NodeTime nt{path[t].n, t};
@@ -135,9 +149,19 @@ void Projection::compute()
                         agent_edgetimes_[a][et] += val;
 
                         ++t;
-                        auto& finish_times = agent_node_finish_[{a, nt.n}];
+                        auto& finish_times = agent_target_finishing_[{a, nt.n}];
                         finish_times.resize(std::max<Size>(finish_times.size(), t + 1));
                         finish_times[t] += val;
+                    }
+                    for (Agent finishing_agent = 0; finishing_agent < A; ++finishing_agent)
+                    {
+                        const auto t = latest_target_crossing_times_[finishing_agent];
+                        if (finishing_agent != a && t > 0)
+                        {
+                            auto& crossing_times = pair_target_crossing_vals_[{a, finishing_agent}];
+                            crossing_times.resize(std::max<Size>(crossing_times.size(), t + 1));
+                            crossing_times[t] += val;
+                        }
                     }
                 }
             }
@@ -218,10 +242,10 @@ void Projection::compute()
     {
         ZoneScopedNC("Compute projection C", TRACY_COLOUR);
 
-        // Sum finish time values.
-        for (auto& [an, finish_times] : agent_node_finish_)
+        // Sum the finishing time values.
+        for (auto& [an, finish_times] : agent_target_finishing_)
         {
-            // Sum the finish time values.
+            // Sum the finishing time values.
             debug_assert(finish_times.size() >= 2);
             for (Time t = 1; t < finish_times.size(); ++t)
             {
@@ -230,8 +254,8 @@ void Projection::compute()
 
             // Create projection value objects for quick look-up.
             const auto a = an.a;
-            const auto n = an.n;
-            auto& finish_time_lists = list_node_finish_.at(n);
+            const auto target = an.n;
+            auto& finish_time_lists = list_target_finish_.at(target);
             finish_time_lists.resize(finish_times.size());
             for (Time t = 0; t < finish_time_lists.size(); ++t)
             {
@@ -256,11 +280,30 @@ void Projection::compute()
     {
         ZoneScopedNC("Compute projection D", TRACY_COLOUR);
 
-        // Include the finish time values in the projections.
+        for (auto& [aa, crossing_times] : pair_target_crossing_vals_)
+        {
+            const auto crossing_agent = aa.a1;
+            const auto finishing_agent = aa.a2;
+            const auto target = instance_.agents[finishing_agent].target;
+
+            debug_assert(crossing_times.size() > 0);
+            Float cum_sum = 0.0;
+            for (Time t = crossing_times.size() - 1; t >= 0; --t)
+                if (crossing_times[t])
+                {
+                    cum_sum += crossing_times[t];
+                    agent_target_crossing_[{crossing_agent, target, t}] = cum_sum;
+                }
+        }
+    }
+    {
+        ZoneScopedNC("Compute projection E", TRACY_COLOUR);
+
+        // Include the finishing time values in the projections.
         for (Agent a = 0; a < A; ++a)
         {
             for (auto& [nt, val] : agent_nodetimes_[a])
-                if (const auto it = agent_node_finish_.find({a, nt.n}); it != agent_node_finish_.end())
+                if (const auto it = agent_target_finishing_.find({a, nt.n}); it != agent_target_finishing_.end())
                 {
                     const auto& finish_times = it->second;
                     debug_assert(finish_times.size() >= 1);
@@ -269,7 +312,7 @@ void Projection::compute()
                 }
             for (auto& [et, val] : agent_edgetimes_[a])
                 if (et.d == Direction::WAIT)
-                    if (const auto it = agent_node_finish_.find({a, et.n}); it != agent_node_finish_.end())
+                    if (const auto it = agent_target_finishing_.find({a, et.n}); it != agent_target_finishing_.end())
                     {
                         const auto& finish_times = it->second;
                         debug_assert(finish_times.size() >= 1);
@@ -278,24 +321,15 @@ void Projection::compute()
                     }
         }
         for (auto& [nt, val] : summed_nodetimes_)
-            if (const auto it = node_finish_.find(nt.n); it != node_finish_.end())
+            if (const auto it = target_finishing_.find(nt.n); it != target_finishing_.end())
             {
                 const auto& finish_times = *it->second.second;
                 debug_assert(finish_times.size() >= 1);
                 const auto t = std::min<Time>(finish_times.size() - 1, nt.t);
                 val += finish_times[t];
             }
-        // for (auto& [et, val] : summed_undirected_edgetimes_)
-        //     if (et.d == Direction::WAIT)
-        //         if (const auto it = node_finish_.find(et.n); it != node_finish_.end())
-        //         {
-        //             const auto& finish_times = *it->second.second;
-        //             debug_assert(finish_times.size() >= 1);
-        //             const auto t = std::min<Time>(finish_times.size() - 1, et.t);
-        //             val += finish_times[t];
-        //         }
         for (auto& [nt, vals_ptr] : list_fractional_nodetimes_)
-            if (const auto it = node_finish_.find(nt.n); it != node_finish_.end())
+            if (const auto it = target_finishing_.find(nt.n); it != target_finishing_.end())
             {
                 const auto a = it->second.first;
                 const auto& finish_times = *it->second.second;
@@ -308,7 +342,7 @@ void Projection::compute()
             }
         for (auto& [et, vals_ptr] : list_fractional_edgetimes_)
             if (et.d == Direction::WAIT)
-                if (const auto it = node_finish_.find(et.n); it != node_finish_.end())
+                if (const auto it = target_finishing_.find(et.n); it != target_finishing_.end())
                 {
                     const auto a = it->second.first;
                     const auto& finish_times = *it->second.second;
@@ -408,9 +442,9 @@ Float Projection::find_summed_nodetime(const NodeTime nt) const
         debug_assert(is_eq(check_val, it->second));
         return it->second;
     }
-    else if (const auto it = node_finish_.find(nt.n); it != node_finish_.end())
+    else if (const auto it = target_finishing_.find(nt.n); it != target_finishing_.end())
     {
-        const auto& finish_times = *(it->second.second);
+        const auto& finish_times = *it->second.second;
         debug_assert(finish_times.size() >= 1);
         const auto t = std::min<Time>(finish_times.size() - 1, nt.t);
         debug_assert(is_eq(check_val, finish_times[t]));
@@ -448,9 +482,9 @@ Float Projection::find_summed_nodetime(const NodeTime nt) const
 //         debug_assert(is_eq(check_val, it->second));
 //         return it->second;
 //     }
-//     else if (const auto it = node_finish_.find(et.n); it != node_finish_.end())
+//     else if (const auto it = target_finishing_.find(et.n); it != target_finishing_.end())
 //     {
-//         const auto& finish_times = *(it->second.second);
+//         const auto& finish_times = it->second.second;
 //         debug_assert(finish_times.size() >= 1);
 //         const auto t = std::min<Time>(finish_times.size() - 1, et.t);
 //         debug_assert(is_eq(check_val, finish_times[t]));
@@ -485,7 +519,7 @@ Float Projection::find_agent_nodetime(const Agent a, const NodeTime nt) const
         debug_assert(is_eq(check_val, it->second));
         return it->second;
     }
-    else if (const auto it = agent_node_finish_.find({a, nt.n}); it != agent_node_finish_.end())
+    else if (const auto it = agent_target_finishing_.find({a, nt.n}); it != agent_target_finishing_.end())
     {
         const auto& finish_times = it->second;
         debug_assert(finish_times.size() >= 1);
@@ -554,13 +588,13 @@ Float Projection::find_agent_wait_edgetime(const Agent a, const EdgeTime et) con
         debug_assert(is_eq(check_val, it->second));
         return it->second;
     }
-    else if (const auto it = agent_node_finish_.find({a, et.n}); it != agent_node_finish_.end())
+    else if (const auto it = agent_target_finishing_.find({a, et.n}); it != agent_target_finishing_.end())
     {
-        const auto& finish_vals = it->second;
-        debug_assert(finish_vals.size() >= 1);
-        const auto t = std::min<Time>(finish_vals.size() - 1, et.t);
-        debug_assert(is_eq(check_val, finish_vals[t]));
-        return finish_vals[t];
+        const auto& finish_times = it->second;
+        debug_assert(finish_times.size() >= 1);
+        const auto t = std::min<Time>(finish_times.size() - 1, et.t);
+        debug_assert(is_eq(check_val, finish_times[t]));
+        return finish_times[t];
     }
     else
     {
@@ -599,7 +633,7 @@ const ProjectionValues& Projection::find_list_fractional_nodetime(const NodeTime
 #endif
         return *it->second;
     }
-    else if (const auto it = list_node_finish_.find(nt.n); it != list_node_finish_.end())
+    else if (const auto it = list_target_finish_.find(nt.n); it != list_target_finish_.end())
     {
         const auto& finish_vals = it->second;
         const auto t = std::min<Time>(finish_vals.size() - 1, nt.t);
@@ -695,7 +729,7 @@ const ProjectionValues& Projection::find_list_fractional_wait_edgetime(const Edg
 #endif
         return *it->second;
     }
-    else if (const auto it = list_node_finish_.find(et.n); it != list_node_finish_.end())
+    else if (const auto it = list_target_finish_.find(et.n); it != list_target_finish_.end())
     {
         const auto& finish_vals = it->second;
         const auto t = std::min<Time>(finish_vals.size() - 1, et.t);

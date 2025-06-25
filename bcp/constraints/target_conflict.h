@@ -10,7 +10,6 @@ Author: Edward Lam <ed@ed-lam.com>
 #include "constraints/separator.h"
 #include "master/constraint.h"
 #include "types/matrix.h"
-#include "types/tuple.h"
 #include "types/vector.h"
 
 class TargetConflictSeparator : public Separator
@@ -31,7 +30,6 @@ class TargetConflictSeparator : public Separator
 
     // Helper data
     Vector<TargetConstraintCandidate> candidates_;
-    Vector<Pair<Time, Float>> finishing_vals_;
     Matrix<UInt8> num_separated_;
 
   public:

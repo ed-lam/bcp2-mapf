@@ -59,3 +59,15 @@ inline std::size_t hash_value(const AgentTime at) noexcept
     static_assert(sizeof(AgentTime) == sizeof(UInt64));
     return boost::hash<decltype(at.id)>{}(at.id);
 }
+
+inline std::size_t hash_value(const AgentNodeTime ant) noexcept
+{
+    static_assert(sizeof(AgentNodeTime) == sizeof(UInt64));
+    return boost::hash<decltype(ant.id)>{}(ant.id);
+}
+
+inline std::size_t hash_value(const AgentAgent aa) noexcept
+{
+    static_assert(sizeof(AgentAgent) == sizeof(UInt64));
+    return boost::hash<decltype(aa.id)>{}(aa.id);
+}

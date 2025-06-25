@@ -12,6 +12,7 @@ Author: Edward Lam <ed@ed-lam.com>
 #include "types/memory_pool.h"
 #include "types/ranges.h"
 #include "types/tuple.h"
+#include "types/vector.h"
 
 class MasterProblem;
 class Problem;
@@ -50,15 +51,18 @@ class Projection
     HashMap<EdgeTime, Float> summed_undirected_edgetimes_;
 
     // Solution for reaching the target at particular times
-    HashMap<AgentNode, Vector<Float>> agent_node_finish_;
-    HashMap<Node, Pair<Agent, Vector<Float>*>> node_finish_;
+    HashMap<AgentAgent, Vector<Float>> pair_target_crossing_vals_;
+    Vector<Time> latest_target_crossing_times_;
+    HashMap<Node, Pair<Agent, Vector<Float>*>> target_finishing_;
+    HashMap<AgentNode, Vector<Float>> agent_target_finishing_;
+    HashMap<AgentNodeTime, Float> agent_target_crossing_;
 
     // Solution in the original space, listed by agent
     MemoryPool memory_pool_;
     ProjectionValues* zeros_;
     HashMap<NodeTime, ProjectionValues*> list_fractional_nodetimes_;
     HashMap<EdgeTime, ProjectionValues*> list_fractional_edgetimes_;
-    HashMap<Node, Vector<ProjectionValues*>> list_node_finish_;
+    HashMap<Node, Vector<ProjectionValues*>> list_target_finish_;
 
   public:
     // Constructors and destructor
@@ -77,7 +81,6 @@ class Projection
     const auto& summed_nodetimes() const { return summed_nodetimes_; }
     const auto& summed_undirected_edgetimes() const { return summed_undirected_edgetimes_; }
     Float find_summed_nodetime(const NodeTime et) const;
-    // Float find_summed_wait_edgetime(const EdgeTime et) const;
 
     // Get agent values
     auto agent_move_edgetimes(const Agent a) const
@@ -85,7 +88,8 @@ class Projection
         return agent_edgetimes_[a] |
             Ranges::views::filter([](const auto& it) { return it.first.d != Direction::WAIT; });
     }
-    const auto& agent_node_finish() const { return agent_node_finish_; }
+    const auto& target_finishing() const { return target_finishing_; }
+    const auto& agent_target_crossing() const { return agent_target_crossing_; }
     Float find_agent_nodetime(const Agent a, const NodeTime nt) const;
     Float find_agent_move_edgetime(const Agent a, const EdgeTime et) const;
     Float find_agent_wait_edgetime(const Agent a, const EdgeTime et) const;

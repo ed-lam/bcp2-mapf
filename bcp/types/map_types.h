@@ -174,3 +174,40 @@ static_assert(std::has_unique_object_representations_v<AgentTime>);
 static_assert(std::is_trivial<AgentTime>::value);
 inline Bool operator==(const AgentTime a, const AgentTime b) { return a.id == b.id; }
 inline Bool operator!=(const AgentTime a, const AgentTime b) { return !(a == b); }
+
+union AgentNodeTime
+{
+    struct
+    {
+        UInt16 a;
+        UInt16 t;
+        Node n;
+    };
+    UInt64 id;
+
+    constexpr AgentNodeTime() noexcept = default;
+    constexpr AgentNodeTime(const Agent a, const Node n, const Time t) noexcept : a(a), t(t), n(n) {}
+};
+static_assert(sizeof(AgentNodeTime) == 8);
+static_assert(std::has_unique_object_representations_v<AgentNodeTime>);
+static_assert(std::is_trivial<AgentNodeTime>::value);
+inline Bool operator==(const AgentNodeTime lhs, const AgentNodeTime rhs) { return lhs.id == rhs.id; }
+inline Bool operator!=(const AgentNodeTime lhs, const AgentNodeTime rhs) { return !(lhs == rhs); }
+
+union AgentAgent
+{
+    struct
+    {
+        Agent a1;
+        Agent a2;
+    };
+    UInt64 id;
+
+    constexpr AgentAgent() noexcept = default;
+    constexpr AgentAgent(const Agent a1, const Agent a2) noexcept : a1(a1), a2(a2) {}
+};
+static_assert(sizeof(AgentAgent) == 8);
+static_assert(std::has_unique_object_representations_v<AgentAgent>);
+static_assert(std::is_trivial<AgentAgent>::value);
+inline Bool operator==(const AgentAgent lhs, const AgentAgent rhs) { return lhs.id == rhs.id; }
+inline Bool operator!=(const AgentAgent lhs, const AgentAgent rhs) { return !(lhs == rhs); }
