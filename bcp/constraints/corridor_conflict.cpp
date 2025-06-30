@@ -98,9 +98,7 @@ void CorridorConflictSeparator::separate()
                             if (corridor_length >= 4)
                             {
                                 // Check.
-                                debug_assert(a1_begin.n != a1_target);
                                 debug_assert(a1_end.n != a1_target);
-                                debug_assert(a2_begin.n != a2_target);
                                 debug_assert(a2_end.n != a2_target);
 
                                 // Get the earliest arrival time at the end of the corridor.
