@@ -447,13 +447,36 @@ void Problem::print_log_header()
     ZoneScopedC(TRACY_COLOUR);
 
     print_log_separator();
+    println("{:>8s} | "
+            "{:>9s} | "
+            "{:>8s} | "
+            "{:>8s} | "
+            "{:>8s} | "
+            "{:>7s} | "
+            "{:>7s} | "
+            "{:>10s} | "
 #ifdef DEBUG
-    println("{:>8s} | {:>9s} | {:>8s} | {:>8s} | {:>8s} | {:>7s} | {:>7s} | {:>10s} | {:>10s} | {:>11s} | {:>11s} | {:>15s} | {:>8s}",
-            "Time", "Iteration", "Closed", "Open", "Depth", "Columns", "Rows", "Master Obj", "Kappa", "Lower Bound", "Upper Bound", "Found By", "Gap");
-#else
-    println("{:>8s} | {:>9s} | {:>8s} | {:>8s} | {:>8s} | {:>7s} | {:>7s} | {:>10s} | {:>11s} | {:>11s} | {:>15s} | {:>8s}",
-            "Time", "Iteration", "Closed", "Open", "Depth", "Columns", "Rows", "Master Obj", "Lower Bound", "Upper Bound", "Found By", "Gap");
+            "{:>10s} | "
 #endif
+            "{:>11s} | "
+            "{:>11s} | "
+            "{:>15s} | "
+            "{:>8s}",
+            "Time",
+            "Iteration",
+            "Closed",
+            "Open",
+            "Depth",
+            "Columns",
+            "Rows",
+            "Master Obj",
+#ifdef DEBUG
+            "Kappa",
+#endif
+            "Lower Bound",
+            "Upper Bound",
+            "Found By",
+            "Gap");
     print_log_separator();
 }
 
@@ -472,11 +495,21 @@ void Problem::print_node_log()
     const auto lb_val = lb();
     const auto gap = (ub_val - lb_val) / ub_val;
     const auto gap_str = std::isfinite(gap) ? fmt::format("{:7.2f}%", gap * 100.0) : "-";
+    println("{:>8.2f} | "
+            "{:>9d} | "
+            "{:>8d} | "
+            "{:>8d} | "
+            "{:>8d} | "
+            "{:>7d} | "
+            "{:>7d} | "
+            "{:>10s} | "
 #ifdef DEBUG
-    println("{:>8.2f} | {:>9d} | {:>8d} | {:>8d} | {:>8d} | {:>7d} | {:>7d} | {:>10s} | {:>10.2f} | {:>11.2f} | {:>11.2f} | {:>15s} | {:>8s}",
-#else
-    println("{:>8.2f} | {:>9d} | {:>8d} | {:>8d} | {:>8d} | {:>7d} | {:>7d} | {:>10s} | {:>11.2f} | {:>11.2f} | {:>15s} | {:>8s}",
+            "{:>10.2f} | "
 #endif
+            "{:>11.2f} | "
+            "{:>11.2f} | "
+            "{:>15s} | "
+            "{:>8s}",
             clock_.elapsed_time(),
             iter_,
             bbtree_.num_closed(),
@@ -511,11 +544,21 @@ void Problem::print_sol_log(const String& found_by)
     const auto lb_val = std::min(bbtree_lb_val, ub_val);
     const auto gap = (ub_val - lb_val) / ub_val;
     const auto gap_str = std::isfinite(gap) ? fmt::format("{:7.2f}%", gap * 100.0) : "-";
+    println("{:>8.2f} | "
+            "{:>9d} | "
+            "{:>8d} | "
+            "{:>8d} | "
+            "{:>8d} | "
+            "{:>7d} | "
+            "{:>7d} | "
+            "{:>10s} | "
 #ifdef DEBUG
-    println("{:>8.2f} | {:>9d} | {:>8d} | {:>8d} | {:>8d} | {:>7d} | {:>7d} | {:>10s} | {:>10.2f} | {:>11.2f} | {:>11.2f} | {:>15s} | {:>8s}",
-#else
-    println("{:>8.2f} | {:>9d} | {:>8d} | {:>8d} | {:>8d} | {:>7d} | {:>7d} | {:>10s} | {:>11.2f} | {:>11.2f} | {:>15s} | {:>8s}",
+            "{:>10.2f} | "
 #endif
+            "{:>11.2f} | "
+            "{:>11.2f} | "
+            "{:>15s} | "
+            "{:>8s}",
             clock_.elapsed_time(),
             iter_,
             bbtree_.num_closed(),
@@ -538,106 +581,143 @@ void Problem::print_results() const
 {
     ZoneScopedC(TRACY_COLOUR);
 
-    const auto solve_time = clock_.total_duration();
-    const auto num_nodes = bbtree_.num_closed();
-    const auto lb_val = eps_ceil(lb());
-    const auto ub_val = ub();
-    const auto status = (lb_val == INF    ? "Infeasible" :
-                         ub_val == INF    ? "Unknown" :
-                         lb_val == ub_val ? "Optimal" :
-                                            "Feasible");
-    const auto gap = (ub_val - lb_val) / ub_val;
-    const auto gap_str = std::isfinite(gap) ? fmt::format("{:.2f}%", gap * 100.0) : "-";
+    // Print solve statistics.
+    {
+        const auto solve_time = clock_.total_duration();
+        const auto num_nodes = bbtree_.num_closed();
+        const auto lb_val = eps_ceil(lb());
+        const auto ub_val = ub();
+        const auto status = (lb_val == INF    ? "Infeasible" :
+                             ub_val == INF    ? "Unknown" :
+                             lb_val == ub_val ? "Optimal" :
+                                                "Feasible");
+        const auto gap = (ub_val - lb_val) / ub_val;
+        const auto gap_str = std::isfinite(gap) ? fmt::format("{:.2f}%", gap * 100.0) : "-";
+        println("");
+        println("{:<13} {:<.2f} seconds", "Solve time:", solve_time);
+        println("{:<13} {}", "Status:", status);
+        println("{:<13} {}", "Nodes solved:", num_nodes);
+        println("{:<13} {:.0f}", "Upper bound:", ub_val);
+        println("{:<13} {:.0f}", "Lower bound:", lb_val);
+        println("{:<13} {}", "Gap:", gap_str);
+    }
 
-    println("");
-    println("{:<13} {:<.2f} seconds", "Solve time:", solve_time);
-    println("{:<13} {}", "Status:", status);
-    println("{:<13} {}", "Nodes solved:", num_nodes);
-    println("{:<13} {:.0f}", "Upper bound:", ub_val);
-    println("{:<13} {:.0f}", "Lower bound:", lb_val);
-    println("{:<13} {}", "Gap:", gap_str);
+    // Print pricers statistics.
+    {
+        println("");
+        println("{:-^57}", "");
+        println("{:<28s} | "
+                "{:>8s} | "
+                "{:>15s}",
+                "Pricer",
+                "Time",
+                "Columns Added");
+        println("{:-^57}", "");
+        println("{:<28s} | "
+                "{:8.2f} | "
+                "{:15d}",
+                pricer_.name(),
+                pricer_.run_time(),
+                pricer_.num_added());
+        println("{:-^57}", "");
+    }
 
-    println("");
-    println("{:-^57}", "");
-    println("{:<28s} | {:>8s} | {:>15s}", "Pricer", "Time", "Columns Added");
-    println("{:-^57}", "");
-    println("{:<28s} | {:8.2f} | {:15d}", pricer_.name(), pricer_.run_time(), pricer_.num_added());
-    println("{:-^57}", "");
+    // Print separators statistics.
+    {
+        println("");
+        println("{:-^57}", "");
+        println("{:<28s} | "
+                "{:>8s} | "
+                "{:>15s}",
+                "Separator",
+                "Time",
+                "Rows Added");
+        println("{:-^57}", "");
+        const auto f = [](auto&& x) {
+            println("{:<28s} | "
+                    "{:8.2f} | "
+                    "{:15d}",
+                    x.name(),
+                    x.run_time(),
+                    x.num_added());
+        };
+        std::apply([&](auto& ...x) { (..., f(x)); }, initial_constraints_.subroutines);
+        std::apply([&](auto& ...x) { (..., f(x)); }, lazy_constraints_.subroutines);
+        println("{:-^57}", "");
+    }
 
-    static_assert(decltype(initial_constraints_)::size() == 1, "Incorrect number of initial constraint families for printing");
-    static_assert(decltype(lazy_constraints_)::size() == 8, "Incorrect number of lazy constraint families for printing");
-    println("");
-    println("{:-^57}", "");
-    println("{:<28s} | {:>8s} | {:>15s}", "Separator", "Time", "Rows Added");
-    println("{:-^57}", "");
-    println("{:<28s} | {:8.2f} | {:15d}",
-            initial_constraints_.get<0>().name(), initial_constraints_.get<0>().run_time(),
-            initial_constraints_.get<0>().num_added());
-    println("{:<28s} | {:8.2f} | {:15d}",
-            lazy_constraints_.get<0>().name(), lazy_constraints_.get<0>().run_time(),
-            lazy_constraints_.get<0>().num_added());
-    println("{:<28s} | {:8.2f} | {:15d}",
-            lazy_constraints_.get<1>().name(), lazy_constraints_.get<1>().run_time(),
-            lazy_constraints_.get<1>().num_added());
-    println("{:<28s} | {:8.2f} | {:15d}",
-            lazy_constraints_.get<2>().name(), lazy_constraints_.get<2>().run_time(),
-            lazy_constraints_.get<2>().num_added());
-    println("{:<28s} | {:8.2f} | {:15d}",
-            lazy_constraints_.get<3>().name(), lazy_constraints_.get<3>().run_time(),
-            lazy_constraints_.get<3>().num_added());
-    println("{:<28s} | {:8.2f} | {:15d}",
-            lazy_constraints_.get<4>().name(), lazy_constraints_.get<4>().run_time(),
-            lazy_constraints_.get<4>().num_added());
-    println("{:<28s} | {:8.2f} | {:15d}",
-            lazy_constraints_.get<5>().name(), lazy_constraints_.get<5>().run_time(),
-            lazy_constraints_.get<5>().num_added());
-    println("{:<28s} | {:8.2f} | {:15d}",
-            lazy_constraints_.get<6>().name(), lazy_constraints_.get<6>().run_time(),
-            lazy_constraints_.get<6>().num_added());
-    println("{:<28s} | {:8.2f} | {:15d}",
-            lazy_constraints_.get<7>().name(), lazy_constraints_.get<7>().run_time(),
-            lazy_constraints_.get<7>().num_added());
-    // println("{:<28s} | {:8.2f} | {:15d}",
-    //         lazy_constraints_.get<8>().name(), lazy_constraints_.get<8>().run_time(),
-    //         lazy_constraints_.get<8>().num_added());
-    // println("{:<28s} | {:8.2f} | {:15d}",
-    //         lazy_constraints_.get<9>().name(), lazy_constraints_.get<9>().run_time(),
-    //         lazy_constraints_.get<9>().num_added());
-    println("{:-^57}", "");
+    // Print branchers statistics.
+    {
+        println("");
+        println("{:-^57}", "");
+        println("{:<28s} | "
+                "{:>8s} | "
+                "{:>15s}",
+                "Brancher",
+                "Time",
+                "Nodes Added");
+        println("{:-^57}", "");
+        const auto f = [](auto&& x) {
+            println("{:<28s} | "
+                    "{:8.2f} | "
+                    "{:15d}",
+                    x.name(),
+                    x.run_time(),
+                    x.num_added());
+        };
+        std::apply([&](auto& ...x) { (..., f(x)); }, branchers_.subroutines);
+        println("{:-^57}", "");
+    }
 
-    static_assert(decltype(branchers_)::size() == 2, "Incorrect number of branchers for printing");
-    println("");
-    println("{:-^57}", "");
-    println("{:<28s} | {:>8s} | {:>15s}", "Brancher", "Time", "Nodes Added");
-    println("{:-^57}", "");
-    println("{:<28s} | {:8.2f} | {:15d}",
-            branchers_.get<0>().name(), branchers_.get<0>().run_time(), branchers_.get<0>().num_added());
-    println("{:<28s} | {:8.2f} | {:15d}",
-            branchers_.get<1>().name(), branchers_.get<1>().run_time(), branchers_.get<1>().num_added());
-    println("{:-^57}", "");
+    // Print primal heuristics statistics.
+    {
+        println("");
+        println("{:-^75}", "");
+        println("{:<28s} | "
+                "{:>8s} | "
+                "{:>15s} | "
+                "{:>15s}",
+                "Solutions",
+                "Time",
+                "Improving Found",
+                "Feasible Found");
+        println("{:-^75}", "");
+        println("{:<28s} | "
+                "{:8.2f} | "
+                "{:15d} | "
+                "{:15d}",
+                "LP relaxation", master_.run_time(), lp_num_improving_, lp_num_feasible_);
+        const auto f = [](auto&& x) {
+            println("{:<28s} | "
+                    "{:8.2f} | "
+                    "{:15d} | "
+                    "{:15d}",
+                    x.name(),
+                    x.run_time(),
+                    x.num_improving(),
+                    x.num_feasible());
+        };
+        std::apply([&](auto& ...x) { (..., f(x)); }, heuristics_.subroutines);
+        println("{:-^75}", "");
+    }
 
-    static_assert(decltype(heuristics_)::size() == 2, "Incorrect number of primal heuristics for printing");
-    println("");
-    println("{:-^75}", "");
-    println("{:<28s} | {:>8s} | {:>15s} | {:>15s}", "Solutions", "Time", "Improving Found", "Feasible Found");
-    println("{:-^75}", "");
-    println("{:<28s} | {:8.2f} | {:15d} | {:15d}",
-            "LP relaxation", master_.run_time(), lp_num_improving_, lp_num_feasible_);
-    println("{:<28s} | {:8.2f} | {:15d} | {:15d}",
-            heuristics_.get<0>().name(), heuristics_.get<0>().run_time(),
-            heuristics_.get<0>().num_improving(), heuristics_.get<0>().num_feasible());
-    println("{:<28s} | {:8.2f} | {:15d} | {:15d}",
-            heuristics_.get<1>().name(), heuristics_.get<1>().run_time(),
-            heuristics_.get<1>().num_improving(), heuristics_.get<1>().num_feasible());
-    println("{:-^75}", "");
+    // Print statistics for other activities.
+    {
+        println("");
+        println("{:-^39}", "");
+        println("{:<28s} | "
+                "{:>8s}",
+                "Other Activities",
+                "Time");
+        println("{:-^39}", "");
+        println("{:<28s} | "
+                "{:8.2f}",
+                "Projection",
+                projection_.run_time());
+        println("{:-^39}", "");
+    }
 
-    println("");
-    println("{:-^39}", "");
-    println("{:<28s} | {:>8s}", "Other Activities", "Time");
-    println("{:-^39}", "");
-    println("{:<28s} | {:8.2f}", "Projection", projection_.run_time());
-    println("{:-^39}", "");
-
+    // Print solution.
 #ifndef DEBUG
     if (!sol_.empty())
     {
