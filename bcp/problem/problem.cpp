@@ -249,7 +249,8 @@ void Problem::solve(const Float time_limit)
                             // Skip the current node if its lower bound is higher than the upper bound.
                             if (is_ge(eps_ceil(bbtree_.current_lb()), ub()))
                             {
-                                debugln("Discarding BB tree node {}, lb {}", bbtree_.current_id(), bbtree_.current_lb());
+                                debugln("Discarding BB tree node {}, lb {}",
+                                        bbtree_.current_id(), bbtree_.current_lb());
                                 goto NODE_COMPLETED;
                             }
                         }
