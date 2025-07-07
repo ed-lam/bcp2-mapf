@@ -59,7 +59,7 @@ Problem::Problem(const FilePath& scenario_path, const Agent agent_limit) :
     test_flexible_array_pointers();
 
     // Create initial constraints.
-    std::apply([](auto&... separator) { return (separator.run(), ...); }, initial_constraints_.subroutines);
+    std::apply([](auto& ...separator) { return (separator.run(), ...); }, initial_constraints_);
 }
 
 Cost Problem::lb() const
@@ -211,8 +211,7 @@ void Problem::solve(const Float time_limit)
                 if (master_.status() != MasterProblemStatus::Infeasible && !master_.vars_added())
                 {
                     // Create cuts.
-                    std::apply([](auto&... separator) { return (separator.run(), ...); },
-                               lazy_constraints_.subroutines);
+                    std::apply([](auto& ...separator) { return (separator.run(), ...); }, lazy_constraints_);
 
                     // Store the result if the LP is integer feasible.
                     if (master_.status() == MasterProblemStatus::Integer && !master_.constrs_added())
@@ -260,12 +259,11 @@ void Problem::solve(const Float time_limit)
                 // Run primal heuristics.
                 if (master_.status() != MasterProblemStatus::Infeasible)
                 {
-                    static_assert(std::tuple_size<decltype(heuristics_.subroutines)>() == 2);
-                    if (run_primal_heuristic<0>())
-                    {
-                        goto NODE_COMPLETED;
-                    }
-                    if (run_primal_heuristic<1>())
+                    const auto cutoff = std::apply(
+                        [&](auto& ...heuristic) { return (run_primal_heuristic(heuristic) || ...); },
+                        heuristics_
+                    );
+                    if (cutoff)
                     {
                         goto NODE_COMPLETED;
                     }
@@ -292,12 +290,11 @@ void Problem::solve(const Float time_limit)
                 master_.store_basis(bbtree_.current());
 
                 // Run the branchers.
-                static_assert(std::tuple_size<decltype(branchers_.subroutines)>() == 2);
-                if (run_brancher<0>())
-                {
-                    goto BRANCHED;
-                }
-                if (run_brancher<1>())
+                const auto success = std::apply(
+                    [&](auto& ...brancher) { return (run_brancher(brancher) || ...); },
+                    branchers_
+                );
+                if (success)
                 {
                     goto BRANCHED;
                 }
@@ -375,8 +372,8 @@ void Problem::update_ub(const Cost ub)
     debugln("Updated UB to {}", ub_);
 }
 
-template<Size index>
-Bool Problem::run_primal_heuristic()
+template<class T>
+Bool Problem::run_primal_heuristic(T& heuristic)
 {
     ZoneScopedC(TRACY_COLOUR);
 
@@ -384,7 +381,6 @@ Bool Problem::run_primal_heuristic()
     stop_if_timed_out();
 
     // Run the primal heuristic.
-    auto& heuristic = heuristics_.get<index>();
     auto [sol_cost, sol] = heuristic.run();
     debug_assert(is_ge(sol_cost, bbtree_.current_lb()));
 
@@ -414,12 +410,11 @@ Bool Problem::run_primal_heuristic()
     return false;
 }
 
-template<Size index>
-Bool Problem::run_brancher()
+template<class T>
+Bool Problem::run_brancher(T& brancher)
 {
     ZoneScopedC(TRACY_COLOUR);
 
-    auto& brancher = branchers_.get<index>();
     auto decisions = brancher.run();
     if (decisions.first && decisions.second)
     {
@@ -634,7 +629,7 @@ void Problem::print_results() const
                 "Time",
                 "Rows Added");
         println("{:-^57}", "");
-        const auto f = [](auto&& x) {
+        constexpr auto f = [](const auto& x) {
             println("{:<28s} | "
                     "{:8.2f} | "
                     "{:15d}",
@@ -642,8 +637,8 @@ void Problem::print_results() const
                     x.run_time(),
                     x.num_added());
         };
-        std::apply([&](auto& ...x) { (..., f(x)); }, initial_constraints_.subroutines);
-        std::apply([&](auto& ...x) { (..., f(x)); }, lazy_constraints_.subroutines);
+        std::apply([&](auto& ...subroutine) { (f(subroutine), ...); }, initial_constraints_);
+        std::apply([&](auto& ...subroutine) { (f(subroutine), ...); }, lazy_constraints_);
         println("{:-^57}", "");
     }
 
@@ -658,7 +653,7 @@ void Problem::print_results() const
                 "Time",
                 "Nodes Added");
         println("{:-^57}", "");
-        const auto f = [](auto&& x) {
+        constexpr auto f = [](const auto& x) {
             println("{:<28s} | "
                     "{:8.2f} | "
                     "{:15d}",
@@ -666,7 +661,7 @@ void Problem::print_results() const
                     x.run_time(),
                     x.num_added());
         };
-        std::apply([&](auto& ...x) { (..., f(x)); }, branchers_.subroutines);
+        std::apply([&](auto& ...subroutine) { (f(subroutine), ...); }, branchers_);
         println("{:-^57}", "");
     }
 
@@ -688,7 +683,7 @@ void Problem::print_results() const
                 "{:15d} | "
                 "{:15d}",
                 "LP relaxation", master_.run_time(), lp_num_improving_, lp_num_feasible_);
-        const auto f = [](auto&& x) {
+        constexpr auto f = [](const auto& x) {
             println("{:<28s} | "
                     "{:8.2f} | "
                     "{:15d} | "
@@ -698,7 +693,7 @@ void Problem::print_results() const
                     x.num_improving(),
                     x.num_feasible());
         };
-        std::apply([&](auto& ...x) { (..., f(x)); }, heuristics_.subroutines);
+        std::apply([&](auto& ...subroutine) { (f(subroutine), ...); }, heuristics_);
         println("{:-^75}", "");
     }
 

@@ -31,9 +31,9 @@ Author: Edward Lam <ed@ed-lam.com>
 #include "pricing/shared_time_expanded_astar_pricer.h"
 #include "pricing/shared_time_interval_astar_pricer.h"
 #include "problem/projection.h"
+#include "problem/subroutine_set.h"
 #include "types/basic_types.h"
 #include "types/clock.h"
-#include "types/tuple.h"
 #include <csignal>
 #include <exception>
 
@@ -60,23 +60,6 @@ class TerminationException : public std::exception
 
 class Problem
 {
-    // Container storing subroutines using static polymorphism
-    template<class... SubroutineTypes>
-    struct SubroutineSet
-    {
-        Tuple<SubroutineTypes...> subroutines;
-
-        SubroutineSet(const Instance& instance, Problem& problem) :
-            subroutines(SubroutineTypes{instance, problem}...) {}
-
-        constexpr static auto size() { return std::tuple_size<Tuple<SubroutineTypes...>>(); }
-
-        template<Size index>
-        const auto& get() const { return std::get<index>(subroutines); }
-        template<Size index>
-        auto& get() { return std::get<index>(subroutines); }
-    };
-
     // Data
     const Instance instance_;
 
@@ -168,10 +151,10 @@ class Problem
     void store_master_obj_history(const Cost master_obj);
     Bool branch_early(const Cost master_obj);
     void update_ub(const Cost ub);
-    template<Size index>
-    Bool run_primal_heuristic();
-    template<Size index>
-    Bool run_brancher();
+    template<class T>
+    Bool run_primal_heuristic(T& heuristic);
+    template<class T>
+    Bool run_brancher(T& heuristic);
     inline Bool timed_out() const { return clock_.timed_out(); }
 
     // Get solution
