@@ -21,18 +21,14 @@ struct AgentData
 
 struct Instance
 {
-    // Instance
+    // Metadata
     String name;
     FilePath scenario_path;
     FilePath map_path;
 
-    // Map
+    // Instance
     Map map;
-
-    // Agents
-    Agent num_agents;
     Vector<AgentData> agents;
-    Time time_horizon;
 
   public:
     // Constructors and destructor
@@ -43,4 +39,7 @@ struct Instance
     Instance& operator=(const Instance&) = delete;
     Instance& operator=(Instance&&) = delete;
     ~Instance() = default;
+
+    // Getters
+    inline Agent num_agents() const { return agents.size(); }
 };
