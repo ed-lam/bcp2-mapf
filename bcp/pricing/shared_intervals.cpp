@@ -30,7 +30,7 @@ SharedIntervals::SharedIntervals(const Map& map, const Bool is_shared) :
     clear();
 
     // Create default interval.
-    default_interval_.start = 0.0;
+    default_interval_.start = 0;
     default_interval_.end = TIME_MAX;
     default_interval_.cost = 0.0;
     default_interval_.next = nullptr;
@@ -127,7 +127,7 @@ Interval* SharedIntervals::duplicate_edge_intervals(const Node n, const Directio
         ZoneScopedNC("Create default interval", TRACY_COLOUR);
 
         intervals = static_cast<Interval*>(interval_storage_.get_buffer<true, false>());
-        intervals->start = 0.0;
+        intervals->start = 0;
         intervals->end = TIME_MAX;
         intervals->cost = 0.0;
         intervals->next = nullptr;
