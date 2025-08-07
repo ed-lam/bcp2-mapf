@@ -334,7 +334,11 @@ void MasterProblem::add_row(UniquePtr<Constraint, FreeDeleter>&& constraint_ptr_
                 }
             }
     }
-    debug_assert((sign == '<' && is_gt(lhs, rhs)) || (sign == '>' && is_lt(lhs, rhs)));
+    debug_assert(
+        (sign == '<' && is_gt(lhs, rhs)) ||
+        (sign == '>' && is_lt(lhs, rhs)) ||
+        (sign == '=' && (is_lt(lhs, rhs) || is_gt(lhs, rhs)))
+    );
 
     // Add the row to the LP.
     debug_assert(constraint.row_ == -1);
