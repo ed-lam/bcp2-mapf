@@ -159,6 +159,14 @@ void Problem::solve(const Float time_limit)
                     next_log_iter_ = iter_ + PRINT_LOG_ROOT_ITERATIONS;
                 }
 
+                // Print paths.
+// #ifdef PRINT_DEBUG
+//                 if (master_.status() != MasterProblemStatus::Infeasible)
+//                 {
+//                     print_paths();
+//                 }
+// #endif
+
                 // Store the objective value history of the master problem.
                 store_master_obj_history(master_.obj());
 
@@ -170,14 +178,6 @@ void Problem::solve(const Float time_limit)
                 {
                     goto NODE_STALLED;
                 }
-
-                // Print paths.
-// #ifdef PRINT_DEBUG
-//                 if (master_.status() != MasterProblemStatus::Infeasible)
-//                 {
-//                     print_paths();
-//                 }
-// #endif
 
                 // Add debug paths in the first iteration.
                 // static Bool added_debug_paths = false;
