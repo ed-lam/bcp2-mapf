@@ -132,7 +132,7 @@ class MasterProblem
 
     // Modifications
     void add_column(UniquePtr<Variable, FreeDeleter>&& variable_ptr, const Cost reduced_cost);
-    void add_convexity_row(UniquePtr<Constraint, FreeDeleter>&& constraint);
+    void add_permanent_row(UniquePtr<Constraint, FreeDeleter>&& constraint);
     void add_row(UniquePtr<Constraint, FreeDeleter>&& constraint);
     void disable_variable(const Variable& variable);
 

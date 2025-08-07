@@ -254,14 +254,9 @@ void MasterProblem::restore_column(Variable* variable_ptr)
     agent_variables_[a].emplace_back(variable_ptr);
 }
 
-void MasterProblem::add_convexity_row(UniquePtr<Constraint, FreeDeleter>&& constraint_ptr)
+void MasterProblem::add_permanent_row(UniquePtr<Constraint, FreeDeleter>&& constraint_ptr)
 {
-    // Check.
-    debug_assert(constraint_ptr->agents().size() == 1);
-    debug_assert(agent_constraints_[constraint_ptr->agents()[0]].size() == 0);
-
     // Mark as non-removable.
-    debug_assert(constraint_ptr->name() == fmt::format("agent({})", constraint_ptr->agents()[0]));
     constraint_ptr->activity_ = INF;
 
     // Create the row.

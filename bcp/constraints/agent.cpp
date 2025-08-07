@@ -54,7 +54,7 @@ void AgentSeparator::create_row(const Agent a)
     debug_assert(reinterpret_cast<std::uintptr_t>(&constraint->a) ==
                  reinterpret_cast<std::uintptr_t>(constraint->data()));
     constraint->a = a;
-    master.add_convexity_row(std::move(constraint));
+    master.add_permanent_row(std::move(constraint));
     ++num_added_;
 }
 
