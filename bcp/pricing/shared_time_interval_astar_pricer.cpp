@@ -275,7 +275,6 @@ void SharedTimeIntervalAStarPricer::add_edgetime_penalty_all_agents(const EdgeTi
     }
 }
 
-
 void SharedTimeIntervalAStarPricer::add_edgetime_penalty_all_except_one_agent(const Agent a,
                                                                               const EdgeTime et,
                                                                               const Cost cost)
@@ -832,10 +831,7 @@ void SharedTimeIntervalAStarPricer::clear()
     ZoneScopedC(TRACY_COLOUR);
 
     // Clear constants.
-    for (auto& data : constants_)
-    {
-        data = 0.0;
-    }
+    std::fill(constants_.begin(), constants_.end(), 0.0);
 
     // Clear waypoints.
     for (auto& data : waypoints_)
