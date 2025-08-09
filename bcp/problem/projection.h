@@ -8,6 +8,7 @@ Author: Edward Lam <ed@ed-lam.com>
 #pragma once
 
 #include "types/basic_types.h"
+#include "types/clock.h"
 #include "types/hash_map.h"
 #include "types/memory_pool.h"
 #include "types/ranges.h"
