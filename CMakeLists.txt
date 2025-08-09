@@ -210,6 +210,7 @@ target_compile_options(bcp2-mapf-tracy PRIVATE
 endif ()
 
 # Set flags.
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${EXTRA_COMPILER_FLAGS}")
 set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} ${EXTRA_LINKER_FLAGS}")
 target_compile_options(bcp2-mapf PRIVATE -march=native)
