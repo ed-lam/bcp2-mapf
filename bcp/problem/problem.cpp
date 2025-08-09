@@ -768,12 +768,12 @@ void Problem::check_solution(const Vector<Variable*>& solution, const Cost cost)
                        "The path for agent {} starts at {} but its starting location is {}",
                        a,
                        format_node(path.front().n, map),
-                       format_node(instance_.agents[0].start, map));
+                       format_node(instance_.agents[a].start, map));
         release_assert(path.back().n == instance_.agents[a].target,
                        "The path for agent {} ends at {} but its target location is {}",
                        a,
                        format_node(path.back().n, map),
-                       format_node(instance_.agents[0].target, map));
+                       format_node(instance_.agents[a].target, map));
 
         // Check if the path is in conflict with paths already selected.
         {
