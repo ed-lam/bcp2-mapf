@@ -408,7 +408,7 @@ void RectangleKnapsackConflictSeparator::separate()
     debugln("Starting separator for rectangle knapsack conflicts");
 
     // Get the problem data.
-    const Agent A = instance_.agents.size();
+    const auto A = instance_.num_agents();
     const auto& map = instance_.map;
     auto& master = problem_.master();
 

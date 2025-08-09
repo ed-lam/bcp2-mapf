@@ -127,7 +127,7 @@ class MasterProblem
     auto convexity_constraints() const
     {
         return all_constraints() |
-               Ranges::views::take(instance_.agents.size());
+               Ranges::views::take(instance_.num_agents());
     }
 
     // Modifications
@@ -163,14 +163,14 @@ class MasterProblem
     }
     auto secondary_variables_storage()
     {
-        return Ranges::subrange(agent_variables_, agent_variables_ + instance_.agents.size());
+        return Ranges::subrange(agent_variables_, agent_variables_ + instance_.num_agents());
     }
     auto secondary_constraints_storage()
     {
         return Ranges::views::concat(
             Ranges::subrange(&universal_constraints_, &universal_constraints_ + 1),
             Ranges::subrange(&subset_constraints_, &subset_constraints_ + 1),
-            Ranges::subrange(agent_constraints_, agent_constraints_ + instance_.agents.size())
+            Ranges::subrange(agent_constraints_, agent_constraints_ + instance_.num_agents())
         );
     }
 

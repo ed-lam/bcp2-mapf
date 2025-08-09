@@ -23,7 +23,7 @@ Author: Edward Lam <ed@ed-lam.com>
 MultiAgentExitEntryConflictSeparator::MultiAgentExitEntryConflictSeparator(const Instance& instance, Problem& problem) :
     Separator(instance, problem),
     candidates_(),
-    num_separated_(instance.agents.size())
+    num_separated_(instance.num_agents())
 {
 }
 
@@ -35,7 +35,7 @@ void MultiAgentExitEntryConflictSeparator::separate()
     debugln("Starting separator for multi-agent exit-entry conflicts");
 
     // Get the problem data.
-    const Agent A = instance_.agents.size();
+    const auto A = instance_.num_agents();
     const auto& map = instance_.map;
 
     // Get the solution.

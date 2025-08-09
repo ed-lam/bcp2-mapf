@@ -24,7 +24,7 @@ CorridorConflictSeparator::CorridorConflictSeparator(const Instance& instance, P
     Separator(instance, problem),
     distance_heuristic_(problem.pricer().distance_heuristic()),
     candidates_(),
-    num_separated_(instance.agents.size(), instance.agents.size())
+    num_separated_(instance.num_agents(), instance.num_agents())
 {
 }
 
@@ -36,7 +36,7 @@ void CorridorConflictSeparator::separate()
     debugln("Starting separator for corridor conflicts");
 
     // Get the problem data.
-    const Agent A = instance_.agents.size();
+    const auto A = instance_.num_agents();
     const auto& map = instance_.map;
     const auto& master = problem_.master();
 

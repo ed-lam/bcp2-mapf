@@ -59,7 +59,7 @@ SharedTimeExpandedAStar::SharedTimeExpandedAStar(const Instance& instance,
     latest_target_time_(TIME_MAX),
 
     label_storage_(),
-    closed_(std::make_unique<HashMap<NodeTime, void*>[]>(instance_.agents.size())),
+    closed_(std::make_unique<HashMap<NodeTime, void*>[]>(instance_.num_agents())),
     open_infeasible_(),
     open_feasible_(),
     obj_()

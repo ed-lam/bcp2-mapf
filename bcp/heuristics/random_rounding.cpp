@@ -23,7 +23,7 @@ Author: Edward Lam <ed@ed-lam.com>
 RandomRounding::RandomRounding(const Instance& instance, Problem& problem) :
     PrimalHeuristic(instance, problem),
     rng_(RANDOM_SEED),
-    agents_(instance_.agents.size()),
+    agents_(instance_.num_agents()),
     nodetime_in_use_(),
     edgetime_in_use_(),
     target_crossed_(),
@@ -38,7 +38,7 @@ Pair<Cost, Vector<Variable*>> RandomRounding::execute()
 
     // Get the problem data.
     const auto& map = instance_.map;
-    const Agent A = instance_.agents.size();
+    const auto A = instance_.num_agents();
 
     // Get the master problem.
     const auto& master = problem_.master();

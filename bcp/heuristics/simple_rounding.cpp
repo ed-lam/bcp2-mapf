@@ -36,7 +36,7 @@ Pair<Cost, Vector<Variable*>> SimpleRounding::execute()
 
     // Get the problem data.
     const auto& map = instance_.map;
-    const Agent A = instance_.agents.size();
+    const auto A = instance_.num_agents();
 
     // Get the master problem.
     const auto& master = problem_.master();

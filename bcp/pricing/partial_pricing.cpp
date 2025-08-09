@@ -16,8 +16,8 @@ Author: Edward Lam <ed@ed-lam.com>
 
 PartialPricing::PartialPricing(const Instance& instance, Problem& problem) :
     master_(problem.master()),
-    pricing_tasks_(instance.agents.size()),
-    pricing_priority_(instance.agents.size(), 1.0)
+    pricing_tasks_(instance.num_agents()),
+    pricing_priority_(instance.num_agents(), 1.0)
 {
     ZoneScopedC(TRACY_COLOUR);
 

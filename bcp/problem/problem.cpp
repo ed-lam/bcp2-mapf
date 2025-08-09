@@ -90,7 +90,7 @@ void Problem::solve(const Float time_limit)
     ZoneScopedC(TRACY_COLOUR);
 
     // Get the problem data.
-    const Agent A = instance_.agents.size();
+    const auto A = instance_.num_agents();
 
     // Solve.
     try
@@ -743,7 +743,7 @@ void Problem::check_solution(const Vector<Variable*>& solution, const Cost cost)
 {
     // Get the problem data.
     const auto& map = instance_.map;
-    const Agent A = instance_.agents.size();
+    const auto A = instance_.num_agents();
 
     // Check size.
     release_assert(solution.size() == A, "Solution has {} paths but there are {} agents", solution.size(), A);

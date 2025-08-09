@@ -21,14 +21,14 @@ Projection::Projection(const Instance& instance, Problem& problem) :
     master_(problem.master()),
     clock_(),
 
-    agent_nodetimes_(instance_.agents.size()),
-    agent_edgetimes_(instance_.agents.size()),
+    agent_nodetimes_(instance_.num_agents()),
+    agent_edgetimes_(instance_.num_agents()),
 
     summed_nodetimes_(),
     summed_undirected_edgetimes_(),
 
     pair_target_crossing_vals_(),
-    latest_target_crossing_times_(instance_.agents.size()),
+    latest_target_crossing_times_(instance_.num_agents()),
     target_finishing_(),
     agent_target_finishing_(),
     agent_target_crossing_(),
@@ -42,7 +42,7 @@ Projection::Projection(const Instance& instance, Problem& problem) :
     ZoneScopedC(TRACY_COLOUR);
 
     // Initialise hash tables.
-    const Agent A = instance_.agents.size();
+    const auto A = instance_.num_agents();
     for (Agent a = 0; a < A; ++a)
     {
         const auto target = instance_.agents[a].target;
@@ -77,7 +77,7 @@ void Projection::clear()
     ZoneScopedC(TRACY_COLOUR);
 
     // Get the problem data.
-    const Agent A = instance_.agents.size();
+    const auto A = instance_.num_agents();
 
     // Clear data.
     for (Agent a = 0; a < A; ++a)
@@ -106,7 +106,7 @@ void Projection::compute()
     ZoneScopedC(TRACY_COLOUR);
 
     // Get the problem data.
-    const Agent A = instance_.agents.size();
+    const auto A = instance_.num_agents();
     const auto& map = instance_.map;
 
     {
@@ -426,7 +426,7 @@ Float Projection::find_summed_nodetime(const NodeTime nt) const
     // Calculate value for verification.
 #ifdef DEBUG
     Float check_val = 0.0;
-    for (Agent a = 0; a < instance_.agents.size(); ++a)
+    for (Agent a = 0; a < instance_.num_agents(); ++a)
         for (const auto& variable : master_.agent_variables(a))
         {
             const auto& path = variable.path();
@@ -465,7 +465,7 @@ Float Projection::find_summed_nodetime(const NodeTime nt) const
 //     debug_assert(et.d == Direction::WAIT);
 // #ifdef DEBUG
 //     Float check_val = 0.0;
-//     for (Agent a = 0; a < instance_.agents.size(); ++a)
+//     for (Agent a = 0; a < instance_.num_agents(); ++a)
 //         for (const auto& variable : master_.agent_variables(a))
 //         {
 //             const auto& path = variable.path();
@@ -610,7 +610,7 @@ const ProjectionValues& Projection::find_list_fractional_nodetime(const NodeTime
     // Calculate values for verification.
 #ifdef DEBUG
 #ifndef PROJECT_FRACTIONAL_ONLY
-    const Agent A = instance_.agents.size();
+    const auto A = instance_.num_agents();
     Vector<Float> check_vals(A);
     for (Agent a = 0; a < A; ++a)
         for (const auto& variable : master_.agent_variables(a))
@@ -663,7 +663,7 @@ const ProjectionValues& Projection::find_list_fractional_move_edgetime(const Edg
     debug_assert(et.d != Direction::WAIT);
 #ifdef DEBUG
 #ifndef PROJECT_FRACTIONAL_ONLY
-    const Agent A = instance_.agents.size();
+    const auto A = instance_.num_agents();
     Vector<Float> check_vals(A);
     for (Agent a = 0; a < A; ++a)
         for (const auto& variable : master_.agent_variables(a))
@@ -705,7 +705,7 @@ const ProjectionValues& Projection::find_list_fractional_wait_edgetime(const Edg
     debug_assert(et.d == Direction::WAIT);
 #ifdef DEBUG
 #ifndef PROJECT_FRACTIONAL_ONLY
-    const Agent A = instance_.agents.size();
+    const auto A = instance_.num_agents();
     Vector<Float> check_vals(A);
     for (Agent a = 0; a < A; ++a)
         for (const auto& variable : master_.agent_variables(a))

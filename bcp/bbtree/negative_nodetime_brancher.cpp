@@ -39,7 +39,7 @@ Decisions NegativeNodeTimeBrancher::branch()
     ZoneScopedC(TRACY_COLOUR);
 
     // Get the problem data.
-    const Agent A = instance_.agents.size();
+    const auto A = instance_.num_agents();
     auto& master = problem_.master();
 
     // Calculate the number of times each nodetime is used.

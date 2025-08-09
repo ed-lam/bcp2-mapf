@@ -38,10 +38,10 @@ struct MDDNode
 RectangleCliqueConflictSeparator::RectangleCliqueConflictSeparator(const Instance& instance, Problem& problem) :
     Separator(instance, problem),
     memory_pool_(),
-    agent_mdd_(instance_.agents.size()),
+    agent_mdd_(instance_.num_agents()),
     mdd_next_agent_(),
     candidates_(),
-    num_separated_(instance.agents.size(), instance.agents.size())
+    num_separated_(instance.num_agents(), instance.num_agents())
 {
 }
 
@@ -53,7 +53,7 @@ void RectangleCliqueConflictSeparator::separate()
     debugln("Starting separator for rectangle clique conflicts");
 
     // Get the problem data.
-    const Agent A = instance_.agents.size();
+    const auto A = instance_.num_agents();
     const auto& map = instance_.map;
     const auto& master = problem_.master();
     // master.print_paths();

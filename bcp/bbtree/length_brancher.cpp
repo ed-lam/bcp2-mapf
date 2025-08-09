@@ -29,7 +29,7 @@ Decisions LengthBrancher::branch()
     ZoneScopedC(TRACY_COLOUR);
 
     // Get the problem data.
-    const Agent A = instance_.agents.size();
+    const auto A = instance_.num_agents();
     auto& master = problem_.master();
 
     // Find the earliest and latest time that an agent reaches its target.
@@ -185,7 +185,7 @@ void LengthBrancher::disable_vars(const BrancherData* const data)
     ZoneScopedC(TRACY_COLOUR);
 
     // Get the problem data.
-    const Agent A = instance_.agents.size();
+    const auto A = instance_.num_agents();
     auto& master = problem_.master();
 
     // Get the constraint data.

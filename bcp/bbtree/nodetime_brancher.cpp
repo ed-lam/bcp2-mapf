@@ -38,7 +38,7 @@ Decisions NodeTimeBrancher::branch()
     ZoneScopedC(TRACY_COLOUR);
 
     // Get the problem data.
-    const Agent A = instance_.agents.size();
+    const auto A = instance_.num_agents();
     auto& master = problem_.master();
 
     // Calculate branching candidates.
@@ -356,7 +356,7 @@ void NodeTimeBrancher::disable_vars(const BrancherData* const data)
     ZoneScopedC(TRACY_COLOUR);
 
     // Get the problem data.
-    const Agent A = instance_.agents.size();
+    const auto A = instance_.num_agents();
     auto& master = problem_.master();
 
     // Get the constraint data.

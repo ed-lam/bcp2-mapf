@@ -22,7 +22,7 @@ Author: Edward Lam <ed@ed-lam.com>
 TargetConflictSeparator::TargetConflictSeparator(const Instance& instance, Problem& problem) :
     Separator(instance, problem),
     candidates_(),
-    num_separated_(instance.agents.size(), instance.agents.size())
+    num_separated_(instance.num_agents(), instance.num_agents())
 {
 }
 

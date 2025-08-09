@@ -21,11 +21,11 @@ SharedTimeExpandedAStarPricer::SharedTimeExpandedAStarPricer(const Instance& ins
     problem_(problem),
     distance_heuristic_(instance.map),
 
-    constants_(instance.agents.size()),
-    waypoints_(instance.agents.size()),
-    once_off_penalties_(instance.agents.size()),
-    rectangle_penalties_(instance.agents.size()),
-    finish_time_penalties_(instance.agents.size()),
+    constants_(instance.num_agents()),
+    waypoints_(instance.num_agents()),
+    once_off_penalties_(instance.num_agents()),
+    rectangle_penalties_(instance.num_agents()),
+    finish_time_penalties_(instance.num_agents()),
 
     shared_edgetime_penalties_(),
     agent_edgetime_penalties_(),
@@ -35,8 +35,8 @@ SharedTimeExpandedAStarPricer::SharedTimeExpandedAStarPricer(const Instance& ins
     agent_latest_visit_time_(),
     discarded_latest_visit_time_(),
     latest_visit_time_template_(),
-    earliest_target_time_(instance.agents.size()),
-    latest_target_time_(instance.agents.size()),
+    earliest_target_time_(instance.num_agents()),
+    latest_target_time_(instance.num_agents()),
 
     partial_pricing_(instance, problem),
     solver_(instance, problem, distance_heuristic_, num_added_)
@@ -45,7 +45,7 @@ SharedTimeExpandedAStarPricer::SharedTimeExpandedAStarPricer(const Instance& ins
 
     // Get the problem data.
     const auto& agents = instance.agents;
-    const Agent A = agents.size();
+    const auto A = instance.num_agents();
 
     // Store the target of each agent.
     targets_.resize(A);

@@ -21,15 +21,15 @@ SharedTimeIntervalAStarPricer::SharedTimeIntervalAStarPricer(const Instance& ins
     problem_(problem),
     distance_heuristic_(instance.map),
 
-    constants_(instance.agents.size()),
-    waypoints_(instance.agents.size()),
-    once_off_penalties_(instance.agents.size()),
-    rectangle_penalties_(instance.agents.size()),
+    constants_(instance.num_agents()),
+    waypoints_(instance.num_agents()),
+    once_off_penalties_(instance.num_agents()),
+    rectangle_penalties_(instance.num_agents()),
 
     shared_intervals_(map_, true),
     agent_intervals_(),
     discarded_agent_intervals_(),
-    deferred_end_intervals_(instance.agents.size()),
+    deferred_end_intervals_(instance.num_agents()),
 
     partial_pricing_(instance, problem),
     solver_(instance, problem, distance_heuristic_, num_added_)
@@ -38,7 +38,7 @@ SharedTimeIntervalAStarPricer::SharedTimeIntervalAStarPricer(const Instance& ins
 
     // Get the problem data.
     const auto& agents = instance.agents;
-    const Agent A = agents.size();
+    const auto A = instance.num_agents();
 
     // Store the target of each agent.
     targets_.resize(A);
@@ -519,7 +519,7 @@ void SharedTimeIntervalAStarPricer::add_once_off_penalty_all_except_one_agent(co
     }
     else
     {
-        const Agent A = targets_.size();
+        const Agent A = constants_.size();
         for (Agent agent = 0; agent < A; ++agent)
             if (agent != a)
             {
@@ -718,7 +718,7 @@ Cost SharedTimeIntervalAStarPricer::solve()
     ZoneScopedC(TRACY_COLOUR);
 
     // Get the problem data.
-    const Agent A = waypoints_.size();
+    const Agent A = constants_.size();
 
     // Get the master problem and branch-and-bound tree.
     const auto& master = problem_.master();

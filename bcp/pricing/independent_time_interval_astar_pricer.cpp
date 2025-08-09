@@ -25,8 +25,7 @@ IndependentTimeIntervalAStarPricer::IndependentTimeIntervalAStarPricer(const Ins
     ZoneScopedC(TRACY_COLOUR);
 
     // Get the problem data.
-    const auto& agents = instance.agents;
-    const Agent A = agents.size();
+    const auto A = instance.num_agents();
 
     // Create pricers.
     infeasible_solvers_.reserve(A);

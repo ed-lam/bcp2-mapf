@@ -51,7 +51,7 @@ MasterProblem::MasterProblem(const Instance& instance, Problem& problem) :
 {
     ZoneScopedC(TRACY_COLOUR);
 
-    const Agent A = instance_.agents.size();
+    const auto A = instance_.num_agents();
     agent_variables_ = new Vector<Variable*>[A];
     agent_constraints_ = new Vector<Constraint*>[A];
 }
@@ -291,7 +291,7 @@ void MasterProblem::add_row(UniquePtr<Constraint, FreeDeleter>&& constraint_ptr_
 #endif
     if (is_universal || is_every_agent)
     {
-        const Agent A = instance_.agents.size();
+        const auto A = instance_.num_agents();
         for (Agent a = 0; a < A; ++a)
             for (const auto& variable : agent_variables(a))
             {
@@ -356,7 +356,7 @@ void MasterProblem::add_row(UniquePtr<Constraint, FreeDeleter>&& constraint_ptr_
             subset_constraints_.emplace_back(constraint_ptr);
         }
 
-        const Agent A = instance_.agents.size();
+        const auto A = instance_.num_agents();
         for (Agent a = 0; a < A; ++a)
         {
             agent_constraints_[a].emplace_back(constraint_ptr);
@@ -395,7 +395,7 @@ void MasterProblem::restore_row(Constraint* constraint_ptr)
     Vector<Float> coeffs;
     if (is_universal || is_every_agent)
     {
-        const Agent A = instance_.agents.size();
+        const auto A = instance_.num_agents();
         for (Agent a = 0; a < A; ++a)
             for (const auto& variable : agent_variables(a))
             {
@@ -442,7 +442,7 @@ void MasterProblem::restore_row(Constraint* constraint_ptr)
             subset_constraints_.emplace_back(constraint_ptr);
         }
 
-        const Agent A = instance_.agents.size();
+        const auto A = instance_.num_agents();
         for (Agent a = 0; a < A; ++a)
         {
             agent_constraints_[a].emplace_back(constraint_ptr);
@@ -790,7 +790,7 @@ void MasterProblem::print_paths() const
     ZoneScopedC(TRACY_COLOUR);
 
     // Get the problem data.
-    const Agent A = instance_.agents.size();
+    const auto A = instance_.num_agents();
     const auto& map = instance_.map;
 
     // Find the makespan.

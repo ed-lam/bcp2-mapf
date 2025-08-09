@@ -20,7 +20,7 @@ void AgentSeparator::separate()
     ZoneScopedC(TRACY_COLOUR);
 
     // Get the problem data.
-    const Agent A = instance_.agents.size();
+    const auto A = instance_.num_agents();
 
     // Create the constraint for every agent.
     for (Agent a = 0; a < A; ++a)

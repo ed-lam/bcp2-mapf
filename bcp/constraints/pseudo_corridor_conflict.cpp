@@ -22,7 +22,7 @@ Author: Edward Lam <ed@ed-lam.com>
 PseudoCorridorConflictSeparator::PseudoCorridorConflictSeparator(const Instance& instance, Problem& problem) :
     Separator(instance, problem),
     candidates_(),
-    num_separated_(instance.agents.size(), instance.agents.size())
+    num_separated_(instance.num_agents(), instance.num_agents())
 {
 }
 
@@ -34,7 +34,7 @@ void PseudoCorridorConflictSeparator::separate()
     debugln("Starting separator for pseudo-corridor conflicts");
 
     // Get the problem data.
-    const Agent A = instance_.agents.size();
+    const auto A = instance_.num_agents();
     const auto& map = instance_.map;
 
     // Get the solution.
