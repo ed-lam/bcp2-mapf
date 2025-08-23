@@ -43,7 +43,7 @@ class IndependentTimeExpandedAStarPricer : public PricerBase
 
     // Set nodetime branching decisions and cost constant
     void add_waypoint(const Agent a, const NodeTime nt);
-    void set_constant(const Agent a, const Cost constant);
+    void set_constant(const Agent a, const Cost cost);
 
     // Add nodetime costs
     void add_nodetime_penalty_all_agents(const NodeTime nt, const Cost cost);

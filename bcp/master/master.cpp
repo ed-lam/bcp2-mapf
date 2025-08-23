@@ -329,6 +329,8 @@ void MasterProblem::add_row(UniquePtr<Constraint, FreeDeleter>&& constraint_ptr_
                 }
             }
     }
+
+    // Check violation.
     debug_assert(
         (sign == '<' && is_gt(lhs, rhs)) ||
         (sign == '>' && is_lt(lhs, rhs)) ||
@@ -483,6 +485,9 @@ void MasterProblem::solve()
         // Clear.
         disable_cols_.clear();
     }
+
+    // Write model to file.
+    // lp_.write();
 
     // Choose a simplex algorithm.
     const auto algorithm = vars_added_ && !constrs_added_ ? LPAlgorithm::PrimalSimplex : LPAlgorithm::DualSimplex;

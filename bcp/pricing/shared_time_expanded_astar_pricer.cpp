@@ -77,15 +77,15 @@ void SharedTimeExpandedAStarPricer::add_waypoint(const Agent a, const NodeTime n
     waypoints_[a].push_back(nt);
 }
 
-void SharedTimeExpandedAStarPricer::set_constant(const Agent a, const Cost constant)
+void SharedTimeExpandedAStarPricer::set_constant(const Agent a, const Cost cost)
 {
     ZoneScopedC(TRACY_COLOUR);
 
     // Check.
     debug_assert(a >= 0);
 
-    // Overwrite the constasnt.
-    constants_[a] = constant;
+    // Overwrite the constant.
+    constants_[a] = cost;
 }
 
 void SharedTimeExpandedAStarPricer::add_nodetime_penalty_all_agents(const NodeTime nt, const Cost cost)

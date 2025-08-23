@@ -52,18 +52,18 @@ void IndependentTimeExpandedAStarPricer::add_waypoint(const Agent a, const NodeT
     }
 }
 
-void IndependentTimeExpandedAStarPricer::set_constant(const Agent a, const Cost constant)
+void IndependentTimeExpandedAStarPricer::set_constant(const Agent a, const Cost cost)
 {
     ZoneScopedC(TRACY_COLOUR);
 
     debug_assert(a >= 0);
     if (status_ == MasterProblemStatus::Infeasible)
     {
-        infeasible_solvers_[a].set_constant(constant);
+        infeasible_solvers_[a].set_constant(cost);
     }
     else
     {
-        feasible_solvers_[a].set_constant(constant);
+        feasible_solvers_[a].set_constant(cost);
     }
 }
 

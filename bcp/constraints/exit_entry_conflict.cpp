@@ -161,12 +161,12 @@ void ExitEntryConflictSeparator::create_row(const ExitEntryConstraintCandidate& 
         debug_assert(num_a2_es < 10);
         a2_es[num_a2_es++] = Edge{from_n, Direction::NORTH};
     }
-    if (const auto from_n = map.get_west(destination);  from_n != origin && map[from_n])
+    if (const auto from_n = map.get_west(destination); from_n != origin && map[from_n])
     {
         debug_assert(num_a2_es < 10);
         a2_es[num_a2_es++] = Edge{from_n, Direction::EAST};
     }
-    if (const auto from_n = map.get_east(destination);  from_n != origin && map[from_n])
+    if (const auto from_n = map.get_east(destination); from_n != origin && map[from_n])
     {
         debug_assert(num_a2_es < 10);
         a2_es[num_a2_es++] = Edge{from_n, Direction::WEST};
