@@ -160,12 +160,12 @@ void Problem::solve(const Float time_limit)
                 }
 
                 // Print paths.
-// #ifdef PRINT_DEBUG
-//                 if (master_.status() != MasterProblemStatus::Infeasible)
-//                 {
-//                     print_paths();
-//                 }
-// #endif
+#ifdef PRINT_DEBUG
+                if (master_.status() != MasterProblemStatus::Infeasible)
+                {
+                    print_paths();
+                }
+#endif
 
                 // Store the objective value history of the master problem.
                 store_master_obj_history(master_.obj());
