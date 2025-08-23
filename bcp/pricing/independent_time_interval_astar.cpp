@@ -562,6 +562,9 @@ void IndependentTimeIntervalAStar<feasible>::generate_waypoint(Label* current)
 {
     // ZoneScopedC(TRACY_COLOUR);
 
+    // Check.
+    static_assert(!towards_end);
+
     // Get the label data.
     const auto current_nt = current->nt;
     debug_assert(current_nt.n == waypoints_[next_waypoint_index_].n);
@@ -639,14 +642,13 @@ void IndependentTimeIntervalAStar<feasible>::generate_waypoint(Label* current)
         const NodeTime next_nt{next_n, next_t};
 
         // Calculate the earliest arrival time.
-        const auto h_to_waypoint_time = waypoint_t - next_t;
-        debug_assert(h_to_waypoint_time >= 0);
+        constexpr auto h_to_waypoint_time = 0;
         const auto h_to_target = h_to_waypoint_time + h_waypoint_to_target;
         debug_assert(h_to_target >= earliest_target_time_ - next_t);
         const auto next_time_f = next_t + h_to_target;
 
         // Exit if time infeasible.
-        if ((!towards_end && next_t > waypoint_t) || next_time_f > latest_target_time_)
+        if (next_time_f > latest_target_time_)
         {
             // Print.
 #ifdef DEBUG
@@ -1033,16 +1035,18 @@ void IndependentTimeIntervalAStar<feasible>::expand(Label* current)
     }
 
     // Push to the waypoint if at the correct location.
-    if (!towards_end && current_n == waypoints_[next_waypoint_index_].n)
-    {
-        generate_waypoint<towards_end>(current);
-    }
+    if constexpr (!towards_end)
+        if (current_n == waypoints_[next_waypoint_index_].n)
+        {
+            generate_waypoint<towards_end>(current);
+        }
 
     // Push to the end if at the correct location.
-    if (towards_end && current_n == target_)
-    {
-        generate_end(current);
-    }
+    if constexpr (towards_end)
+        if (current_n == target_)
+        {
+            generate_end(current);
+        }
 }
 
 #ifdef USE_RESERVATION_LOOKUP
