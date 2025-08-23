@@ -70,7 +70,7 @@ class MasterProblem
 
     // Getters
     inline auto status() const { return status_; }
-    inline auto obj() const { debug_assert(!(lp_.obj() <= 0.0)); return lp_.obj(); }
+    inline auto obj() const { debug_assert(!(lp_.obj() < 0.0)); return lp_.obj(); }
     inline auto num_cols() const { return lp_.num_cols(); }
     inline auto num_rows() const { return lp_.num_rows(); }
     inline auto condition_number() const { return lp_.condition_number(); }
