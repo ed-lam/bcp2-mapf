@@ -5,6 +5,8 @@ Noncommercial License 1.0.0. A copy of this license can found in LICENSE.md.
 Author: Edward Lam <ed@ed-lam.com>
 */
 
+#ifdef USE_SHARED_TIME_EXPANDED_ASTAR_PRICER
+
 // #define PRINT_DEBUG
 
 #include "pricing/shared_time_expanded_astar_pricer.h"
@@ -13,7 +15,8 @@ Author: Edward Lam <ed@ed-lam.com>
 
 #define TRACY_COLOUR tracy::Color::ColorType::DodgerBlue
 
-SharedTimeExpandedAStarPricer::SharedTimeExpandedAStarPricer(const Instance& instance, Problem& problem) :
+SharedTimeExpandedAStarPricer::SharedTimeExpandedAStarPricer(const Instance& instance,
+                                                             Problem& problem) :
     map_(instance.map),
     targets_(),
     targets_hash_(),
@@ -71,7 +74,7 @@ void SharedTimeExpandedAStarPricer::add_waypoint(const Agent a, const NodeTime n
     ZoneScopedC(TRACY_COLOUR);
 
     // Check.
-    debug_assert(a >= 0);
+    DEBUG_ASSERT(a >= 0);
 
     // Add a waypoint.
     waypoints_[a].push_back(nt);
@@ -82,19 +85,20 @@ void SharedTimeExpandedAStarPricer::set_constant(const Agent a, const Cost cost)
     ZoneScopedC(TRACY_COLOUR);
 
     // Check.
-    debug_assert(a >= 0);
+    DEBUG_ASSERT(a >= 0);
 
     // Overwrite the constant.
     constants_[a] = cost;
 }
 
-void SharedTimeExpandedAStarPricer::add_nodetime_penalty_all_agents(const NodeTime nt, const Cost cost)
+void SharedTimeExpandedAStarPricer::add_nodetime_penalty_all_agents(const NodeTime nt,
+                                                                    const Cost cost)
 {
     ZoneScopedC(TRACY_COLOUR);
 
     // Check.
-    debug_assert(map_[nt.n]);
-    debug_assert(cost >= 0.0);
+    DEBUG_ASSERT(map_[nt.n]);
+    DEBUG_ASSERT(cost >= 0.0);
 
     // Ignore if the penalty is 0.
     if (is_le(cost, 0.0))
@@ -142,9 +146,9 @@ void SharedTimeExpandedAStarPricer::add_nodetime_penalty_all_except_one_agent(co
     ZoneScopedC(TRACY_COLOUR);
 
     // Check.
-    debug_assert(a >= 0);
-    debug_assert(map_[nt.n]);
-    debug_assert(cost >= 0.0);
+    DEBUG_ASSERT(a >= 0);
+    DEBUG_ASSERT(map_[nt.n]);
+    DEBUG_ASSERT(cost >= 0.0);
 
     // Ignore if the penalty is 0.
     if (is_le(cost, 0.0))
@@ -155,7 +159,8 @@ void SharedTimeExpandedAStarPricer::add_nodetime_penalty_all_except_one_agent(co
     // Clone the edgetime penalties for the excluded agent.
     copy_edgetime_penalties(a);
 
-    // Add the penalty to the edgetime penalties of all agents except the excluded agent.
+    // Add the penalty to the edgetime penalties of all agents except the excluded
+    // agent.
     for (auto [agent, edgetime_penalties] : all_edgetime_penalties())
         if (agent != a)
         {
@@ -192,16 +197,15 @@ void SharedTimeExpandedAStarPricer::add_nodetime_penalty_all_except_one_agent(co
     }
 }
 
-void SharedTimeExpandedAStarPricer::add_nodetime_penalty_one_agent(const Agent a,
-                                                                   const NodeTime nt,
+void SharedTimeExpandedAStarPricer::add_nodetime_penalty_one_agent(const Agent a, const NodeTime nt,
                                                                    const Cost cost)
 {
     ZoneScopedC(TRACY_COLOUR);
 
     // Check.
-    debug_assert(a >= 0);
-    debug_assert(map_[nt.n]);
-    debug_assert(cost >= 0.0);
+    DEBUG_ASSERT(a >= 0);
+    DEBUG_ASSERT(map_[nt.n]);
+    DEBUG_ASSERT(cost >= 0.0);
 
     // Ignore if the target is unreachable or the penalty is 0.
     if (h_to_target_[a][nt.n] == TIME_MAX || is_le(cost, 0.0))
@@ -238,13 +242,14 @@ void SharedTimeExpandedAStarPricer::add_nodetime_penalty_one_agent(const Agent a
     }
 }
 
-void SharedTimeExpandedAStarPricer::add_edgetime_penalty_all_agents(const EdgeTime et, const Cost cost)
+void SharedTimeExpandedAStarPricer::add_edgetime_penalty_all_agents(const EdgeTime et,
+                                                                    const Cost cost)
 {
     ZoneScopedC(TRACY_COLOUR);
 
     // Check.
-    debug_assert(map_[et.n]);
-    debug_assert(cost >= 0.0);
+    DEBUG_ASSERT(map_[et.n]);
+    DEBUG_ASSERT(cost >= 0.0);
 
     // Ignore if the penalty is 0.
     if (is_le(cost, 0.0))
@@ -277,9 +282,9 @@ void SharedTimeExpandedAStarPricer::add_edgetime_penalty_all_except_one_agent(co
     ZoneScopedC(TRACY_COLOUR);
 
     // Check.
-    debug_assert(a >= 0);
-    debug_assert(map_[et.n]);
-    debug_assert(cost >= 0.0);
+    DEBUG_ASSERT(a >= 0);
+    DEBUG_ASSERT(map_[et.n]);
+    DEBUG_ASSERT(cost >= 0.0);
 
     // Ignore if the penalty is 0.
     if (is_le(cost, 0.0))
@@ -290,7 +295,8 @@ void SharedTimeExpandedAStarPricer::add_edgetime_penalty_all_except_one_agent(co
     // Clone the edgetime penalties for the excluded agent.
     copy_edgetime_penalties(a);
 
-    // Add the penalty to the edgetime penalties of all agents except the excluded agent.
+    // Add the penalty to the edgetime penalties of all agents except the excluded
+    // agent.
     for (auto [agent, edgetime_penalties] : all_edgetime_penalties())
         if (agent != a)
         {
@@ -312,16 +318,15 @@ void SharedTimeExpandedAStarPricer::add_edgetime_penalty_all_except_one_agent(co
     }
 }
 
-void SharedTimeExpandedAStarPricer::add_edgetime_penalty_one_agent(const Agent a,
-                                                                   const EdgeTime et,
+void SharedTimeExpandedAStarPricer::add_edgetime_penalty_one_agent(const Agent a, const EdgeTime et,
                                                                    const Cost cost)
 {
     ZoneScopedC(TRACY_COLOUR);
 
     // Check.
-    debug_assert(a >= 0);
-    debug_assert(map_[et.n]);
-    debug_assert(cost >= 0.0);
+    DEBUG_ASSERT(a >= 0);
+    DEBUG_ASSERT(map_[et.n]);
+    DEBUG_ASSERT(cost >= 0.0);
 
     // Ignore if the target is unreachable or the penalty is 0.
     if (h_to_target_[a][et.n] == TIME_MAX || is_le(cost, 0.0))
@@ -340,7 +345,8 @@ void SharedTimeExpandedAStarPricer::add_edgetime_penalty_one_agent(const Agent a
     }
 }
 
-void SharedTimeExpandedAStarPricer::add_end_penalty_all_agents(const Time earliest, const Time latest, const Cost cost)
+void SharedTimeExpandedAStarPricer::add_end_penalty_all_agents(const Time earliest,
+                                                               const Time latest, const Cost cost)
 {
     ZoneScopedC(TRACY_COLOUR);
 
@@ -366,17 +372,15 @@ void SharedTimeExpandedAStarPricer::add_end_penalty_all_except_one_agent(const A
         }
 }
 
-void SharedTimeExpandedAStarPricer::add_end_penalty_one_agent(const Agent a,
-                                                              const Time earliest,
-                                                              const Time latest,
-                                                              const Cost cost)
+void SharedTimeExpandedAStarPricer::add_end_penalty_one_agent(const Agent a, const Time earliest,
+                                                              const Time latest, const Cost cost)
 {
     ZoneScopedC(TRACY_COLOUR);
 
     // Check.
-    debug_assert(a >= 0);
-    debug_assert((earliest == 0) ^ (latest == TIME_MAX));
-    debug_assert(cost >= 0.0);
+    DEBUG_ASSERT(a >= 0);
+    DEBUG_ASSERT((earliest == 0) ^ (latest == TIME_MAX));
+    DEBUG_ASSERT(cost >= 0.0);
 
     // Ignore if the penalty is 0.
     if (is_le(cost, 0.0))
@@ -385,8 +389,8 @@ void SharedTimeExpandedAStarPricer::add_end_penalty_one_agent(const Agent a,
     }
 
     // Tighten the finish time bounds.
-    debug_assert((earliest == 0) ^ (latest == TIME_MAX));
-    if (cost == INF)
+    DEBUG_ASSERT((earliest == 0) ^ (latest == TIME_MAX));
+    if (cost == COST_INF)
     {
         if (earliest == 0)
         {
@@ -394,22 +398,22 @@ void SharedTimeExpandedAStarPricer::add_end_penalty_one_agent(const Agent a,
         }
         else
         {
-            debug_assert(latest == TIME_MAX);
+            DEBUG_ASSERT(latest == TIME_MAX);
             latest_target_time_[a] = std::min(latest_target_time_[a], earliest - 1);
         }
     }
     else if (earliest == 0)
     {
-        debug_assert(latest >= 1);
+        DEBUG_ASSERT(latest >= 1);
         finish_time_penalties_[a].add(latest - 1, cost);
     }
     else
     {
-        err("Cannot handle adding end penalty for time interval [{},{}]", earliest, latest);
+        ERROR("Cannot handle adding end penalty for time interval [{},{}]", earliest, latest);
     }
 }
 
-template<OnceOffDirection d>
+template <OnceOffDirection d>
 void SharedTimeExpandedAStarPricer::add_once_off_penalty_all_except_one_agent(const Agent a,
                                                                               const NodeTime nt,
                                                                               const Cost cost)
@@ -417,9 +421,9 @@ void SharedTimeExpandedAStarPricer::add_once_off_penalty_all_except_one_agent(co
     ZoneScopedC(TRACY_COLOUR);
 
     // Check.
-    debug_assert(a >= 0);
-    debug_assert(map_[nt.n]);
-    debug_assert(cost >= 0.0);
+    DEBUG_ASSERT(a >= 0);
+    DEBUG_ASSERT(map_[nt.n]);
+    DEBUG_ASSERT(cost >= 0.0);
 
     // Ignore if the penalty is 0.
     if (is_le(cost, 0.0))
@@ -427,13 +431,13 @@ void SharedTimeExpandedAStarPricer::add_once_off_penalty_all_except_one_agent(co
         return;
     }
 
-    // If the node is blocked after a certain time, tighten the latest visit time. Otherwise handle it in the search
-    // because the penalty is only incurred at most once.
-    if (cost == INF)
+    // If the node is blocked after a certain time, tighten the latest visit time. Otherwise handle
+    // it in the search because the penalty is only incurred at most once.
+    if (cost == COST_INF)
     {
         // TODO
-        release_assert(d == OnceOffDirection::GEq,
-                       "Once-off penalty with <= time direction is not yet supported for infinite cost");
+        ASSERT(d == OnceOffDirection::GEq,
+               "Once-off penalty with <= time direction is not yet supported for infinite cost");
 
         // Clone the latest visit times for the excluded agent.
         copy_latest_visit_time(a);
@@ -465,20 +469,22 @@ void SharedTimeExpandedAStarPricer::add_once_off_penalty_all_except_one_agent(co
             }
     }
 }
-template void SharedTimeExpandedAStarPricer::add_once_off_penalty_all_except_one_agent<OnceOffDirection::LEq>(
-    const Agent a, const NodeTime nt, const Cost cost);
-template void SharedTimeExpandedAStarPricer::add_once_off_penalty_all_except_one_agent<OnceOffDirection::GEq>(
-    const Agent a, const NodeTime nt, const Cost cost);
 
-template<OnceOffDirection d>
-void SharedTimeExpandedAStarPricer::add_once_off_penalty_one_agent(const Agent a, const NodeTime nt, const Cost cost)
+template void SharedTimeExpandedAStarPricer::add_once_off_penalty_all_except_one_agent<
+    OnceOffDirection::LEq>(const Agent a, const NodeTime nt, const Cost cost);
+template void SharedTimeExpandedAStarPricer::add_once_off_penalty_all_except_one_agent<
+    OnceOffDirection::GEq>(const Agent a, const NodeTime nt, const Cost cost);
+
+template <OnceOffDirection d>
+void SharedTimeExpandedAStarPricer::add_once_off_penalty_one_agent(const Agent a, const NodeTime nt,
+                                                                   const Cost cost)
 {
     ZoneScopedC(TRACY_COLOUR);
 
     // Check.
-    debug_assert(a >= 0);
-    debug_assert(map_[nt.n]);
-    debug_assert(cost >= 0.0);
+    DEBUG_ASSERT(a >= 0);
+    DEBUG_ASSERT(map_[nt.n]);
+    DEBUG_ASSERT(cost >= 0.0);
 
     // Ignore if the target is unreachable or the penalty is 0.
     if (h_to_target_[a][nt.n] == TIME_MAX || is_le(cost, 0.0))
@@ -486,13 +492,13 @@ void SharedTimeExpandedAStarPricer::add_once_off_penalty_one_agent(const Agent a
         return;
     }
 
-    // If the node is blocked after a certain time, tighten the latest visit time. Otherwise handle it in the search
-    // because the penalty is only incurred at most once.
-    if (cost == INF)
+    // If the node is blocked after a certain time, tighten the latest visit time. Otherwise handle
+    // it in the search because the penalty is only incurred at most once.
+    if (cost == COST_INF)
     {
         // TODO
-        release_assert(d == OnceOffDirection::GEq,
-                       "Once-off penalty with <= time direction is not yet supported for infinite cost");
+        ASSERT(d == OnceOffDirection::GEq,
+               "Once-off penalty with <= time direction is not yet supported for infinite cost");
 
         // Tighten the node visit time bounds.
         auto latest_visit_time = copy_latest_visit_time(a);
@@ -509,23 +515,21 @@ void SharedTimeExpandedAStarPricer::add_once_off_penalty_one_agent(const Agent a
         once_off_penalties_[a].add(cost, nt, d);
     }
 }
+
 template void SharedTimeExpandedAStarPricer::add_once_off_penalty_one_agent<OnceOffDirection::LEq>(
     const Agent a, const NodeTime nt, const Cost cost);
 template void SharedTimeExpandedAStarPricer::add_once_off_penalty_one_agent<OnceOffDirection::GEq>(
     const Agent a, const NodeTime nt, const Cost cost);
 
-void SharedTimeExpandedAStarPricer::add_rectangle_penalty_one_agent(const Agent a,
-                                                                    const EdgeTime first_entry,
-                                                                    const EdgeTime first_exit,
-                                                                    const Time length,
-                                                                    const Node n_increment,
-                                                                    const Cost cost)
+void SharedTimeExpandedAStarPricer::add_rectangle_penalty_one_agent(
+    const Agent a, const EdgeTime first_entry, const EdgeTime first_exit, const Time length,
+    const Node n_increment, const Cost cost)
 {
     ZoneScopedC(TRACY_COLOUR);
 
     // Check.
-    debug_assert(a >= 0);
-    debug_assert(cost >= 0.0);
+    DEBUG_ASSERT(a >= 0);
+    DEBUG_ASSERT(cost >= 0.0);
 
     // Ignore if the the penalty is 0.
     if (is_le(cost, 0.0))
@@ -541,7 +545,7 @@ const EdgeTimePenalties& SharedTimeExpandedAStarPricer::find_edgetime_penalties(
 {
     ZoneScopedC(TRACY_COLOUR);
 
-    debug_assert(a >= 0);
+    DEBUG_ASSERT(a >= 0);
     if (auto it = agent_edgetime_penalties_.find(a); it != agent_edgetime_penalties_.end())
     {
         return *it->second;
@@ -556,7 +560,7 @@ const Time* SharedTimeExpandedAStarPricer::find_latest_visit_time(const Agent a)
 {
     ZoneScopedC(TRACY_COLOUR);
 
-    debug_assert(a >= 0);
+    DEBUG_ASSERT(a >= 0);
     if (auto it = agent_latest_visit_time_.find(a); it != agent_latest_visit_time_.end())
     {
         return it->second.get();
@@ -571,7 +575,7 @@ EdgeTimePenalties& SharedTimeExpandedAStarPricer::copy_edgetime_penalties(const 
 {
     ZoneScopedC(TRACY_COLOUR);
 
-    debug_assert(a >= 0);
+    DEBUG_ASSERT(a >= 0);
     auto [it, created] = agent_edgetime_penalties_.emplace(a, nullptr);
     auto& edgetime_penalties_ptr = it->second;
     if (created)
@@ -595,7 +599,7 @@ Time* SharedTimeExpandedAStarPricer::copy_latest_visit_time(const Agent a)
 {
     ZoneScopedC(TRACY_COLOUR);
 
-    debug_assert(a >= 0);
+    DEBUG_ASSERT(a >= 0);
     auto [it, created] = agent_latest_visit_time_.emplace(a, nullptr);
     auto& latest_visit_time_ptr = it->second;
     if (created)
@@ -631,11 +635,10 @@ Cost SharedTimeExpandedAStarPricer::solve()
     // Add dual solution of constraints spanning all agents to the pricing costs.
     for (const auto& constraint : master.universal_constraints())
     {
-        const auto separator = constraint.separator();
         const auto dual = master.constraint_dual_sol(constraint);
         if (is_ne(dual, 0.0))
         {
-            separator->add_pricing_costs(constraint, dual);
+            constraint.apply_in_pricer(dual, *this);
         }
     }
 
@@ -645,25 +648,26 @@ Cost SharedTimeExpandedAStarPricer::solve()
         brancher->add_pricing_costs(decision);
     }
 
-    // Add dual solution of constraints spanning a subset of agents to the pricing costs.
+    // Add dual solution of constraints spanning a subset of agents to the pricing
+    // costs.
     for (const auto& constraint : master.subset_constraints())
     {
-        const auto separator = constraint.separator();
         const auto dual = master.constraint_dual_sol(constraint);
         if (is_ne(dual, 0.0))
         {
-            separator->add_pricing_costs(constraint, dual);
+            constraint.apply_in_pricer(dual, *this);
         }
     }
 
     // Run the pricer for every agent.
-    Cost new_lb = std::numeric_limits<Cost>::quiet_NaN();
+    Cost new_lb = COST_NAN;
     if (master.status() == MasterProblemStatus::Infeasible)
     {
         // Call every pricer with reduced cost function = 0 - Farkas dual values.
         Bool found = false;
         auto& agents_order = partial_pricing_.agents_order();
-        for (auto it = agents_order.begin(); it != agents_order.end() && (!found || it->must_price); ++it)
+        for (auto it = agents_order.begin(); it != agents_order.end() && (!found || it->must_price);
+             ++it)
         {
             problem_.stop_if_timed_out();
             const auto a = it->a;
@@ -712,7 +716,7 @@ Cost SharedTimeExpandedAStarPricer::solve()
         // If some agents were skipped, a lower bound is not available.
         if (it != agents_order.end())
         {
-            new_lb = std::numeric_limits<Cost>::quiet_NaN();
+            new_lb = COST_NAN;
         }
     }
     return new_lb;
@@ -771,3 +775,5 @@ void SharedTimeExpandedAStarPricer::clear()
     std::fill(earliest_target_time_.begin(), earliest_target_time_.end(), 0);
     std::fill(latest_target_time_.begin(), latest_target_time_.end(), TIME_MAX);
 }
+
+#endif

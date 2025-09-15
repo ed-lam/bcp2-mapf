@@ -23,7 +23,7 @@ Bool BestFirstNodeSelection::empty() const
     return open_.empty();
 }
 
-Size BestFirstNodeSelection::size() const
+Size64 BestFirstNodeSelection::size() const
 {
     ZoneScopedC(TRACY_COLOUR);
 
@@ -41,7 +41,7 @@ const SharedPtr<BBNode>& BestFirstNodeSelection::top() const
 {
     ZoneScopedC(TRACY_COLOUR);
 
-    debug_assert(!empty());
+    DEBUG_ASSERT(!empty());
     return open_.top();
 }
 
@@ -49,7 +49,7 @@ void BestFirstNodeSelection::pop()
 {
     ZoneScopedC(TRACY_COLOUR);
 
-    debug_assert(!empty());
+    DEBUG_ASSERT(!empty());
     return open_.pop();
 }
 
@@ -64,10 +64,10 @@ Cost BestFirstNodeSelection::lb() const
 {
     ZoneScopedC(TRACY_COLOUR);
 
-    return !empty() ? top()->lb : INF;
+    return !empty() ? top()->lb : COST_INF;
 }
 
-// ---------------------------------------------------------------------------------------------------------------------
+// -------------------------------------------------------------------------------------------------
 
 Bool DepthFirstNodeSelection::empty() const
 {
@@ -76,7 +76,7 @@ Bool DepthFirstNodeSelection::empty() const
     return open_.empty();
 }
 
-Size DepthFirstNodeSelection::size() const
+Size64 DepthFirstNodeSelection::size() const
 {
     ZoneScopedC(TRACY_COLOUR);
 
@@ -94,7 +94,7 @@ const SharedPtr<BBNode>& DepthFirstNodeSelection::top() const
 {
     ZoneScopedC(TRACY_COLOUR);
 
-    debug_assert(!empty());
+    DEBUG_ASSERT(!empty());
     return open_.back();
 }
 
@@ -102,7 +102,7 @@ void DepthFirstNodeSelection::pop()
 {
     ZoneScopedC(TRACY_COLOUR);
 
-    debug_assert(!empty());
+    DEBUG_ASSERT(!empty());
     return open_.pop_back();
 }
 
@@ -117,10 +117,10 @@ Cost DepthFirstNodeSelection::lb() const
 {
     ZoneScopedC(TRACY_COLOUR);
 
-    return !empty() ? open_.front()->lb : INF;
+    return !empty() ? open_.front()->lb : COST_INF;
 }
 
-// ---------------------------------------------------------------------------------------------------------------------
+// -------------------------------------------------------------------------------------------------
 
 Bool BestFirstDivingNodeSelection::empty() const
 {
@@ -129,7 +129,7 @@ Bool BestFirstDivingNodeSelection::empty() const
     return dfs_.empty() && bfs_.empty();
 }
 
-Size BestFirstDivingNodeSelection::size() const
+Size64 BestFirstDivingNodeSelection::size() const
 {
     ZoneScopedC(TRACY_COLOUR);
 
@@ -150,15 +150,17 @@ const SharedPtr<BBNode>& BestFirstDivingNodeSelection::top() const
 
     if (dfs_.empty())
     {
-        debug_assert(!bfs_.empty());
+        DEBUG_ASSERT(!bfs_.empty());
         subtree_root_ = std::move(bfs_.top());
         bfs_.pop();
         dfs_.push_back(subtree_root_);
-        // println("New subtree root node {}, lb {} from the priority queue", subtree_root_->id, subtree_root_->lb);
+        // PRINTLN("New subtree root node {}, lb {} from the priority queue",
+        //         subtree_root_->id,
+        //         subtree_root_->lb);
     }
     else
     {
-        // println("Top stack node {}, lb {}", dfs_.back()->id, dfs_.back()->lb);
+        // PRINTLN("Top stack node {}, lb {}", dfs_.back()->id, dfs_.back()->lb);
     }
     return dfs_.back();
 }
@@ -167,7 +169,7 @@ void BestFirstDivingNodeSelection::pop()
 {
     ZoneScopedC(TRACY_COLOUR);
 
-    debug_assert(!dfs_.empty());
+    DEBUG_ASSERT(!dfs_.empty());
     dfs_.pop_back();
 }
 
@@ -175,20 +177,26 @@ void BestFirstDivingNodeSelection::push(SharedPtr<BBNode>&& node)
 {
     ZoneScopedC(TRACY_COLOUR);
 
-    debug_assert(subtree_root_);
+    DEBUG_ASSERT(subtree_root_);
     if (is_gt(node->lb, eps_ceil(subtree_root_->lb) + BEST_FIRST_DIVING_LB_DIFFERENCE))
     {
         // if (subtree_root_)
         // {
-        //     println("Pushing node {}, lb {} on to the priority queue with root {}, lb {}",
-        //             node->id, node->lb,
-        //             subtree_root_ ? subtree_root_->id : INF, subtree_root_ ? subtree_root_->lb : INF);
+        //     PRINTLN(
+        //         "Pushing node {}, lb {} on to the priority queue with root {},
+        //         lb {} ",
+        //         node->id,
+        //         node->lb,
+        //         subtree_root_ ? subtree_root_->id : COST_INF,
+        //         subtree_root_ ? subtree_root_->lb : COST_INF);
         // }
         // else
         // {
-        //     println("Pushing node {} with lb {} on to the priority queue without root",
-        //             node->id, node->lb,
-        //             subtree_root_ ? subtree_root_->id : INF, subtree_root_ ? subtree_root_->lb : INF);
+        //     PRINTLN("Pushing node {} with lb {} on to the priority queue without root ",
+        //             node->id,
+        //             node->lb,
+        //             subtree_root_ ? subtree_root_->id : COST_INF,
+        //             subtree_root_ ? subtree_root_->lb : COST_INF);
         // }
         bfs_.push(std::move(node));
     }
@@ -196,15 +204,19 @@ void BestFirstDivingNodeSelection::push(SharedPtr<BBNode>&& node)
     {
         // if (subtree_root_)
         // {
-        //     println("Pushing node {}, lb {} on to the stack with root {}, lb {}",
-        //             node->id, node->lb,
-        //             subtree_root_ ? subtree_root_->id : INF, subtree_root_ ? subtree_root_->lb : INF);
+        //     PRINTLN("Pushing node {}, lb {} on to the stack with root {}, lb {}",
+        //             node->id,
+        //             node->lb,
+        //             subtree_root_ ? subtree_root_->id : COST_INF,
+        //             subtree_root_ ? subtree_root_->lb : COST_INF);
         // }
         // else
         // {
-        //     println("Pushing node {}, lb {} on to the stack without root",
-        //             node->id, node->lb,
-        //             subtree_root_ ? subtree_root_->id : INF, subtree_root_ ? subtree_root_->lb : INF);
+        //     PRINTLN("Pushing node {}, lb {} on to the stack without root",
+        //             node->id,
+        //             node->lb,
+        //             subtree_root_ ? subtree_root_->id : COST_INF,
+        //             subtree_root_ ? subtree_root_->lb : COST_INF);
         // }
         dfs_.push_back(std::move(node));
     }
@@ -221,10 +233,11 @@ Cost BestFirstDivingNodeSelection::lb() const
 {
     ZoneScopedC(TRACY_COLOUR);
 
-    return std::min(!dfs_.empty() ? dfs_.front()->lb : INF, !bfs_.empty() ? bfs_.top()->lb : INF);
+    return std::min(!dfs_.empty() ? dfs_.front()->lb : COST_INF,
+                    !bfs_.empty() ? bfs_.top()->lb : COST_INF);
 }
 
-// ---------------------------------------------------------------------------------------------------------------------
+// -------------------------------------------------------------------------------------------------
 
 Bool CappedBestFirstDivingNodeSelection::empty() const
 {
@@ -233,7 +246,7 @@ Bool CappedBestFirstDivingNodeSelection::empty() const
     return dfs_.empty() && bfs_.empty();
 }
 
-Size CappedBestFirstDivingNodeSelection::size() const
+Size64 CappedBestFirstDivingNodeSelection::size() const
 {
     ZoneScopedC(TRACY_COLOUR);
 
@@ -254,16 +267,18 @@ const SharedPtr<BBNode>& CappedBestFirstDivingNodeSelection::top() const
 
     if (dfs_.empty())
     {
-        debug_assert(!bfs_.empty());
+        DEBUG_ASSERT(!bfs_.empty());
         subtree_root_ = std::move(bfs_.top());
         bfs_.pop();
         dfs_.push_back(subtree_root_);
         subtree_size_ = 0;
-        // println("New subtree root node {}, lb {} from the priority queue", subtree_root_->id, subtree_root_->lb);
+        // PRINTLN("New subtree root node {}, lb {} from the priority queue",
+        //         subtree_root_->id,
+        //         subtree_root_->lb);
     }
     else
     {
-        // println("Top stack node {}, lb {}", dfs_.back()->id, dfs_.back()->lb);
+        // PRINTLN("Top stack node {}, lb {}", dfs_.back()->id, dfs_.back()->lb);
     }
     return dfs_.back();
 }
@@ -272,7 +287,7 @@ void CappedBestFirstDivingNodeSelection::pop()
 {
     ZoneScopedC(TRACY_COLOUR);
 
-    debug_assert(!dfs_.empty());
+    DEBUG_ASSERT(!dfs_.empty());
     dfs_.pop_back();
 }
 
@@ -280,21 +295,25 @@ void CappedBestFirstDivingNodeSelection::push(SharedPtr<BBNode>&& node)
 {
     ZoneScopedC(TRACY_COLOUR);
 
-    debug_assert(subtree_root_);
+    DEBUG_ASSERT(subtree_root_);
     if (is_gt(node->lb, eps_ceil(subtree_root_->lb) + BEST_FIRST_DIVING_LB_DIFFERENCE) ||
         subtree_size_ >= BEST_FIRST_DIVING_CAP)
     {
         // if (subtree_root_)
         // {
-        //     println("Pushing node {}, lb {} on to the priority queue with root {}, lb {}",
-        //             node->id, node->lb,
-        //             subtree_root_ ? subtree_root_->id : INF, subtree_root_ ? subtree_root_->lb : INF);
+        //     PRINTLN("Pushing node {}, lb {} on to the priority queue with root {}, lb {}",
+        //             node->id,
+        //             node->lb,
+        //             subtree_root_ ? subtree_root_->id : COST_INF,
+        //             subtree_root_ ? subtree_root_->lb : COST_INF);
         // }
         // else
         // {
-        //     println("Pushing node {} with lb {} on to the priority queue without root",
-        //             node->id, node->lb,
-        //             subtree_root_ ? subtree_root_->id : INF, subtree_root_ ? subtree_root_->lb : INF);
+        //     PRINTLN("Pushing node {} with lb {} on to the priority queue without root",
+        //             node->id,
+        //             node->lb,
+        //             subtree_root_ ? subtree_root_->id : COST_INF,
+        //             subtree_root_ ? subtree_root_->lb : COST_INF);
         // }
         bfs_.push(std::move(node));
     }
@@ -302,15 +321,19 @@ void CappedBestFirstDivingNodeSelection::push(SharedPtr<BBNode>&& node)
     {
         // if (subtree_root_)
         // {
-        //     println("Pushing node {}, lb {} on to the stack with root {}, lb {}",
-        //             node->id, node->lb,
-        //             subtree_root_ ? subtree_root_->id : INF, subtree_root_ ? subtree_root_->lb : INF);
+        //     PRINTLN("Pushing node {}, lb {} on to the stack with root {}, lb {}",
+        //             node->id,
+        //             node->lb,
+        //             subtree_root_ ? subtree_root_->id : COST_INF,
+        //             subtree_root_ ? subtree_root_->lb : COST_INF);
         // }
         // else
         // {
-        //     println("Pushing node {}, lb {} on to the stack without root",
-        //             node->id, node->lb,
-        //             subtree_root_ ? subtree_root_->id : INF, subtree_root_ ? subtree_root_->lb : INF);
+        //     PRINTLN("Pushing node {}, lb {} on to the stack without root",
+        //             node->id,
+        //             node->lb,
+        //             subtree_root_ ? subtree_root_->id : COST_INF,
+        //             subtree_root_ ? subtree_root_->lb : COST_INF);
         // }
         dfs_.push_back(std::move(node));
         ++subtree_size_;
@@ -328,10 +351,11 @@ Cost CappedBestFirstDivingNodeSelection::lb() const
 {
     ZoneScopedC(TRACY_COLOUR);
 
-    return std::min(!dfs_.empty() ? dfs_.front()->lb : INF, !bfs_.empty() ? bfs_.top()->lb : INF);
+    return std::min(!dfs_.empty() ? dfs_.front()->lb : COST_INF,
+                    !bfs_.empty() ? bfs_.top()->lb : COST_INF);
 }
 
-// ---------------------------------------------------------------------------------------------------------------------
+// -------------------------------------------------------------------------------------------------
 
 BoundTargetedNodeSelection::BoundTargetedNodeSelection(const Instance&, Problem& problem) noexcept :
     problem_(problem),
@@ -351,7 +375,7 @@ Bool BoundTargetedNodeSelection::empty() const
     return dfs_.empty() && bfs_.empty();
 }
 
-Size BoundTargetedNodeSelection::size() const
+Size64 BoundTargetedNodeSelection::size() const
 {
     ZoneScopedC(TRACY_COLOUR);
 
@@ -370,22 +394,25 @@ void BoundTargetedNodeSelection::push(SharedPtr<BBNode>&& node)
 {
     ZoneScopedC(TRACY_COLOUR);
 
-    if (dual_phase_ ||
-        !subtree_root_ ||
+    if (dual_phase_ || !subtree_root_ ||
         is_gt(node->lb, eps_ceil(subtree_root_->lb) + BEST_FIRST_DIVING_LB_DIFFERENCE) ||
         subtree_size_ >= BEST_FIRST_DIVING_CAP)
     {
         // if (subtree_root_)
         // {
-        //     println("Pushing node {}, lb {} on to the priority queue with root {}, lb {}",
-        //             node->id, node->lb,
-        //             subtree_root_ ? subtree_root_->id : INF, subtree_root_ ? subtree_root_->lb : INF);
+        //     PRINTLN("Pushing node {}, lb {} on to the priority queue with root {}, lb {} ",
+        //             node->id,
+        //             node->lb,
+        //             subtree_root_ ? subtree_root_->id : COST_INF,
+        //             subtree_root_ ? subtree_root_->lb : COST_INF);
         // }
         // else
         // {
-        //     println("Pushing node {} with lb {} on to the priority queue without root",
-        //             node->id, node->lb,
-        //             subtree_root_ ? subtree_root_->id : INF, subtree_root_ ? subtree_root_->lb : INF);
+        //     PRINTLN("Pushing node {} with lb {} on to the priority queue without root ",
+        //             node->id,
+        //             node->lb,
+        //             subtree_root_ ? subtree_root_->id : COST_INF,
+        //             subtree_root_ ? subtree_root_->lb : COST_INF);
         // }
         bfs_.push(std::move(node));
     }
@@ -393,15 +420,19 @@ void BoundTargetedNodeSelection::push(SharedPtr<BBNode>&& node)
     {
         // if (subtree_root_)
         // {
-        //     println("Pushing node {}, lb {} on to the stack with root {}, lb {}",
-        //             node->id, node->lb,
-        //             subtree_root_ ? subtree_root_->id : INF, subtree_root_ ? subtree_root_->lb : INF);
+        //     PRINTLN("Pushing node {}, lb {} on to the stack with root {}, lb {}",
+        //             node->id,
+        //             node->lb,
+        //             subtree_root_ ? subtree_root_->id : COST_INF,
+        //             subtree_root_ ? subtree_root_->lb : COST_INF);
         // }
         // else
         // {
-        //     println("Pushing node {}, lb {} on to the stack without root",
-        //             node->id, node->lb,
-        //             subtree_root_ ? subtree_root_->id : INF, subtree_root_ ? subtree_root_->lb : INF);
+        //     PRINTLN("Pushing node {}, lb {} on to the stack without root",
+        //             node->id,
+        //             node->lb,
+        //             subtree_root_ ? subtree_root_->id : COST_INF,
+        //             subtree_root_ ? subtree_root_->lb : COST_INF);
         // }
         dfs_.push_back(std::move(node));
         ++subtree_size_;
@@ -420,7 +451,7 @@ const SharedPtr<BBNode>& BoundTargetedNodeSelection::top() const
         }
         dfs_.clear();
         dual_phase_ = true;
-        // println("Switching to dual phase");
+        // PRINTLN("Switching to dual phase");
     }
 
     if (dual_phase_)
@@ -431,16 +462,18 @@ const SharedPtr<BBNode>& BoundTargetedNodeSelection::top() const
     {
         if (dfs_.empty())
         {
-            debug_assert(!bfs_.empty());
+            DEBUG_ASSERT(!bfs_.empty());
             subtree_root_ = std::move(bfs_.top());
             bfs_.pop();
             dfs_.push_back(subtree_root_);
             subtree_size_ = 0;
-            // println("New subtree root node {}, lb {} from the priority queue", subtree_root_->id, subtree_root_->lb);
+            // PRINTLN("New subtree root node {}, lb {} from the priority queue",
+            //         subtree_root_->id,
+            //         subtree_root_->lb);
         }
         else
         {
-            // println("Top stack node {}, lb {}", dfs_.back()->id, dfs_.back()->lb);
+            // PRINTLN("Top stack node {}, lb {}", dfs_.back()->id, dfs_.back()->lb);
         }
         return dfs_.back();
     }
@@ -452,12 +485,12 @@ void BoundTargetedNodeSelection::pop()
 
     if (dual_phase_)
     {
-        debug_assert(!bfs_.empty());
+        DEBUG_ASSERT(!bfs_.empty());
         bfs_.pop();
     }
     else
     {
-        debug_assert(!dfs_.empty());
+        DEBUG_ASSERT(!dfs_.empty());
         dfs_.pop_back();
     }
 }
@@ -466,5 +499,6 @@ Cost BoundTargetedNodeSelection::lb() const
 {
     ZoneScopedC(TRACY_COLOUR);
 
-    return std::min(!dfs_.empty() ? dfs_.front()->lb : INF, !bfs_.empty() ? bfs_.top()->lb : INF);
+    return std::min(!dfs_.empty() ? dfs_.front()->lb : COST_INF,
+                    !bfs_.empty() ? bfs_.top()->lb : COST_INF);
 }

@@ -11,31 +11,37 @@ Author: Edward Lam <ed@ed-lam.com>
 // #define CHECK_HEAP
 #endif
 
-#include "problem/debug.h"
 #include "types/basic_types.h"
+#include "types/debug.h"
 #include "types/float_compare.h"
 #include "types/vector.h"
 
-template<class Item, class Comparison, class SizeType = int64_t, SizeType BranchingFactor = 4>
-class AStarPriorityQueue
+template <class Item, class Comparison, class SizeType = Size64, SizeType BranchingFactor = 4>
+class DAryHeap
 {
   protected:
     Vector<Item> items_;
 
   public:
     // Constructors and destructor
-    AStarPriorityQueue() : items_() {}
-    AStarPriorityQueue(const AStarPriorityQueue&) = delete;
-    AStarPriorityQueue(AStarPriorityQueue&&) = default;
-    AStarPriorityQueue& operator=(const AStarPriorityQueue&) = delete;
-    AStarPriorityQueue& operator=(AStarPriorityQueue&&) = default;
-    ~AStarPriorityQueue() = default;
+    DAryHeap() :
+        items_()
+    {
+    }
+    DAryHeap(const DAryHeap&) = delete;
+    DAryHeap(DAryHeap&&) = default;
+    DAryHeap& operator=(const DAryHeap&) = delete;
+    DAryHeap& operator=(DAryHeap&&) = default;
+    ~DAryHeap() = default;
 
     // Remove all items
-    inline void clear() { items_.clear(); }
+    inline void clear()
+    {
+        items_.clear();
+    }
 
     // Add a new item
-    template<class... T>
+    template <class... T>
     void push(T&&... args)
     {
         // Check for consistency.
@@ -53,7 +59,7 @@ class AStarPriorityQueue
     Item pop()
     {
         // Check for consistency.
-        debug_assert(!items_.empty());
+        DEBUG_ASSERT(!items_.empty());
         check_heap();
 
         // Get the item at the top.
@@ -82,7 +88,7 @@ class AStarPriorityQueue
     }
 
     // Change the priority of an existing item
-    template<class... T>
+    template <class... T>
     void update(SizeType index, T&&... args)
     {
         // Replace the item if required.
@@ -106,7 +112,7 @@ class AStarPriorityQueue
             heapify_up(index);
         }
     }
-    template<class... T>
+    template <class... T>
     void increase(SizeType index, T&&... args)
     {
         // Replace the item if required.
@@ -121,10 +127,10 @@ class AStarPriorityQueue
         check_indices();
 
         // Restore heap invariant.
-        debug_assert(!(index == 0 || Comparison::lt(items_[(index - 1) / BranchingFactor], item)));
+        DEBUG_ASSERT(!(index == 0 || Comparison::lt(items_[(index - 1) / BranchingFactor], item)));
         heapify_up(index);
     }
-    template<class... T>
+    template <class... T>
     void decrease(SizeType index, T&&... args)
     {
         // Replace the item if required.
@@ -139,7 +145,7 @@ class AStarPriorityQueue
         check_indices();
 
         // Restore heap invariant.
-        debug_assert(index == 0 || Comparison::lt(items_[(index - 1) / BranchingFactor], item));
+        DEBUG_ASSERT(index == 0 || Comparison::lt(items_[(index - 1) / BranchingFactor], item));
         heapify_down(index);
     }
 
@@ -147,7 +153,7 @@ class AStarPriorityQueue
     void erase(const SizeType index)
     {
         // Check for consistency.
-        debug_assert(0 <= index && index < items_.size());
+        DEBUG_ASSERT(0 <= index && index < items_.size());
         check_heap();
 
         // Update the index of the item.
@@ -183,24 +189,34 @@ class AStarPriorityQueue
     }
 
     // Get the top item without removing it
-    inline const auto& top() const { debug_assert(!items_.empty()); return items_[0]; }
+    inline const auto& top() const
+    {
+        DEBUG_ASSERT(!items_.empty());
+        return items_[0];
+    }
 
     // Get the number of items stored
-    inline SizeType size() const { return items_.size(); }
+    inline SizeType size() const
+    {
+        return items_.size();
+    }
 
     // Check whether the priority queue is empty
-    inline auto empty() const { return items_.empty(); }
+    inline auto empty() const
+    {
+        return items_.empty();
+    }
 
   protected:
     // Reorder the subtree containing items_[index]
     void heapify_up(SizeType index)
     {
         // Move items up.
-        debug_assert(0 <= index && index < items_.size());
+        DEBUG_ASSERT(0 <= index && index < items_.size());
         while (index > 0)
         {
             const auto parent = (index - 1) / BranchingFactor;
-            debug_assert(0 <= parent && parent < index);
+            DEBUG_ASSERT(0 <= parent && parent < index);
             if (Comparison::lt(items_[index], items_[parent]))
             {
                 swap(index, parent);
@@ -221,13 +237,14 @@ class AStarPriorityQueue
     void heapify_down(SizeType index)
     {
         // Move items down.
-        debug_assert(0 <= index && index < items_.size());
+        DEBUG_ASSERT(0 <= index && index < items_.size());
         while (true)
         {
             // Find best child.
             auto smallest = index;
             {
-                const auto last = std::min<SizeType>(items_.size(), (index * BranchingFactor) + BranchingFactor + 1);
+                const auto last = std::min<SizeType>(
+                    items_.size(), (index * BranchingFactor) + BranchingFactor + 1);
                 for (auto child = (index * BranchingFactor) + 1; child < last; ++child)
                     if (Comparison::lt(items_[child], items_[smallest]))
                     {
@@ -252,8 +269,8 @@ class AStarPriorityQueue
     // Swap the positions of two items
     inline void swap(const SizeType index1, const SizeType index2)
     {
-        debug_assert(0 <= index1 && index1 < items_.size());
-        debug_assert(0 <= index2 && index2 < items_.size());
+        DEBUG_ASSERT(0 <= index1 && index1 < items_.size());
+        DEBUG_ASSERT(0 <= index2 && index2 < items_.size());
         std::swap(items_[index1], items_[index2]);
         update_index(items_[index1], index1);
         update_index(items_[index2], index2);
@@ -271,7 +288,7 @@ class AStarPriorityQueue
 #ifdef CHECK_HEAP
         for (SizeType index = 0; index < items_.size(); ++index)
         {
-            debug_assert(check_index(items_[index], index));
+            DEBUG_ASSERT(check_index(items_[index], index));
         }
 #endif
 #endif
@@ -284,8 +301,8 @@ class AStarPriorityQueue
         for (SizeType index = 1; index < items_.size(); ++index)
         {
             const auto parent = (index - 1) / BranchingFactor;
-            debug_assert(0 <= parent && parent < index);
-            release_assert(Comparison::le(items_[parent], items_[index]));
+            DEBUG_ASSERT(0 <= parent && parent < index);
+            ASSERT(Comparison::le(items_[parent], items_[index]));
         }
 #endif
 #endif

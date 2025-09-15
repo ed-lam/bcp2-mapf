@@ -8,8 +8,7 @@ Author: Edward Lam <ed@ed-lam.com>
 #pragma once
 
 #include "output/formatting.h"
-#include "problem/debug.h"
-#include "types/hash_map.h"
+#include "types/debug.h"
 #include "types/map_types.h"
 #include "types/vector.h"
 
@@ -35,9 +34,18 @@ class RectanglePenalties
     ~RectanglePenalties() noexcept = default;
 
     // Getters
-    auto empty() const { return data_.empty(); }
-    Size size() const { return data_.size(); }
-    const auto& operator[](const Size index) const { return data_[index]; }
+    auto empty() const
+    {
+        return data_.empty();
+    }
+    Size64 size() const
+    {
+        return data_.size();
+    }
+    const auto& operator[](const Size64 index) const
+    {
+        return data_[index];
+    }
 
     // Clear
     inline void clear()
@@ -46,32 +54,36 @@ class RectanglePenalties
     }
 
     // Add a penalty for crossing the boundaries of a rectangle
-    void add(const Cost cost,
-             const EdgeTime first_entry,
-             const EdgeTime first_exit,
-             const Time length,
-             const Node n_increment)
+    void add(const Cost cost, const EdgeTime first_entry, const EdgeTime first_exit,
+             const Time length, const Node n_increment)
     {
-        debug_assert(cost >= 0);
-        debug_assert(first_entry.t >= 0);
+        DEBUG_ASSERT(cost >= 0);
+        DEBUG_ASSERT(first_entry.t >= 0);
         data_.push_back({cost, {first_entry, first_exit}, length, n_increment});
     }
 
     // Print
     void print(const Map& map) const
     {
-        println("Rectangle penalties:");
-        println("{:>26s}{:>26s}{:>26s}{:>26s}{:>10s}{:>12s}{:>18s}",
-                "First Entry", "Last Entry", "First Exit", "Last Exit", "Length", "Direction", "Cost");
-        for (Size index = 0; index < data_.size(); ++index)
+        PRINTLN("Rectangle penalties:");
+        PRINTLN("{:>26s}{:>26s}{:>26s}{:>26s}{:>10s}{:>12s}{:>18s}",
+                "First Entry",
+                "Last Entry",
+                "First Exit",
+                "Last Exit",
+                "Length",
+                "Direction",
+                "Cost");
+        for (Size64 index = 0; index < data_.size(); ++index)
         {
             const auto& [cost, first_ets, length, n_increment] = data_[index];
             const auto d = first_ets[0].d;
             const auto first_entry = first_ets[0];
             const auto first_exit = first_ets[1];
-            const EdgeTime last_entry{first_entry.n + n_increment * length, d, first_entry.t + length};
+            const EdgeTime last_entry{
+                first_entry.n + n_increment * length, d, first_entry.t + length};
             const EdgeTime last_exit{first_exit.n + n_increment * length, d, first_exit.t + length};
-            println("{:>26s}{:>26s}{:>26s}{:>26s}{:>10d}{:>12s}{:>18.2f}",
+            PRINTLN("{:>26s}{:>26s}{:>26s}{:>26s}{:>10d}{:>12s}{:>18.2f}",
                     format_edgetime(first_entry, map),
                     format_edgetime(last_entry, map),
                     format_edgetime(first_exit, map),
@@ -80,6 +92,6 @@ class RectanglePenalties
                     d,
                     cost);
         }
-        println("");
+        PRINTLN("");
     }
 };

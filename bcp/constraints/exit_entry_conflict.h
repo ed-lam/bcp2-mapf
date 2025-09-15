@@ -14,7 +14,7 @@ Author: Edward Lam <ed@ed-lam.com>
 
 class ExitEntryConflictSeparator : public Separator
 {
-    struct ExitEntryConstraint : public Constraint
+    struct ConstraintData
     {
         Agent a1;
         Agent a2;
@@ -25,7 +25,7 @@ class ExitEntryConflictSeparator : public Separator
     };
     struct ExitEntryConstraintCandidate
     {
-        Float lhs;
+        Real64 lhs;
         Agent a1;
         Agent a2;
         Time t;
@@ -37,7 +37,7 @@ class ExitEntryConflictSeparator : public Separator
 
     // Helper data
     Vector<ExitEntryConstraintCandidate> candidates_;
-    Matrix<UInt8> num_separated_;
+    Matrix<UInt16> num_separated_;
 
   public:
     // Constructors and destructor
@@ -45,19 +45,23 @@ class ExitEntryConflictSeparator : public Separator
     ExitEntryConflictSeparator(const Instance& instance, Problem& problem);
 
     // Separator type
-    constexpr static auto name() { return "Exit-entry"; }
+    constexpr static auto name()
+    {
+        return "Exit-entry";
+    }
 
     // Separate
     void separate();
 
     // Add dual solution to pricing costs
-    void add_pricing_costs(const Constraint& constraint, const Float dual);
+    static void apply_in_pricer(const Constraint& constraint, const Real64 dual, Pricer& pricer);
 
     // Add coefficient to a column
-    Float get_coeff(const Constraint& constraint, const Agent a, const Path& path);
+    static Real64 get_coeff(const Constraint& constraint, const Agent a, const Path& path);
 
   private:
     static Bool calculate_a1_coeff(const Edge e, const Time t, const Path& path);
-    static Bool calculate_a2_coeff(const Size32 num_es, const Edge* es, const Time t, const Path& path);
+    static Bool calculate_a2_coeff(const Size32 num_es, const Edge* es, const Time t,
+                                   const Path& path);
     void create_row(const ExitEntryConstraintCandidate& candidate);
 };

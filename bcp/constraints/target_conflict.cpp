@@ -31,7 +31,7 @@ void TargetConflictSeparator::separate()
     ZoneScopedC(TRACY_COLOUR);
 
     // Print.
-    debugln("Starting separator for target conflicts");
+    DEBUGLN("Starting separator for target conflicts");
 
     // Get the solution.
     const auto& projection = problem_.projection();
@@ -50,9 +50,10 @@ void TargetConflictSeparator::separate()
         // WARNING: indices in finishing_vals are offset 1 later
 
         // Check for violation.
-        debug_assert(t >= 1);
-        debug_assert(finishing_vals.size() >= 1);
-        const auto finishing_val = finishing_vals[std::min<Size>(finishing_vals.size() - 1, t - 1)];
+        DEBUG_ASSERT(t >= 1);
+        DEBUG_ASSERT(finishing_vals.size() >= 1);
+        const auto finishing_val =
+            finishing_vals[std::min<Size64>(finishing_vals.size() - 1, t - 1)];
         const auto lhs = finishing_val + crossing_val;
         if (is_gt(lhs, 1.0 + CUT_VIOLATION))
         {
@@ -61,11 +62,12 @@ void TargetConflictSeparator::separate()
     }
 
     // Create the most violated cuts.
-    Size num_separated_this_run = 0;
+    Size64 num_separated_this_run = 0;
     num_separated_.set(0);
     std::sort(candidates_.begin(),
               candidates_.end(),
-              [](const auto& a, const auto& b) { return std::tie(a.lhs, b.nt.t) > std::tie(b.lhs, a.nt.t); });
+              [](const auto& a, const auto& b)
+              { return std::tie(a.lhs, b.nt.t) > std::tie(b.lhs, a.nt.t); });
     for (const auto& candidate : candidates_)
     {
         const auto& [lhs, finishing_agent, crossing_agent, nt] = candidate;
@@ -97,60 +99,52 @@ void TargetConflictSeparator::create_row(const TargetConstraintCandidate& candid
     const auto& [lhs, finishing_agent, crossing_agent, nt] = candidate;
 
     // Print.
-    debugln("    Creating target constraint for finishing agent {} at {} and crossing agent {} with LHS {}",
+    DEBUGLN("    Creating target constraint for finishing agent {} at {} and crossing agent {} "
+            "with LHS {}",
             finishing_agent,
             format_nodetime(nt, instance_.map),
             crossing_agent,
             lhs);
 
     // Create the row.
-    auto name = fmt::format("target({},{},{})", finishing_agent, format_nodetime(nt, instance_.map), crossing_agent);
-    constexpr auto object_size = sizeof(TargetConstraint);
-    constexpr auto hash_size = sizeof(Agent) * 2 + sizeof(NodeTime);
-    auto constraint = Constraint::construct<TargetConstraint>(object_size,
-                                                              hash_size,
-                                                              ConstraintFamily::Target,
-                                                              this,
-                                                              std::move(name),
-                                                              2,
-                                                              '<',
-                                                              1.0);
-    debug_assert(reinterpret_cast<std::uintptr_t>(&constraint->finishing_agent) ==
-                 reinterpret_cast<std::uintptr_t>(constraint->data()));
-    constraint->finishing_agent = finishing_agent;
-    constraint->crossing_agent = crossing_agent;
-    constraint->nt = nt;
+    auto name = fmt::format(
+        "target({},{},{})", finishing_agent, format_nodetime(nt, instance_.map), crossing_agent);
+    constexpr auto data_size = sizeof(ConstraintData);
+    constexpr auto hash_size = data_size;
+    auto constraint = Constraint::construct(
+        '<', 1.0, 2, data_size, hash_size, &apply_in_pricer, &get_coeff, name);
+    auto data = new (constraint->data()) ConstraintData;
+    data->finishing_agent = finishing_agent;
+    data->crossing_agent = crossing_agent;
+    data->nt = nt;
     master.add_row(std::move(constraint));
     ++num_added_;
 }
 
-void TargetConflictSeparator::add_pricing_costs(const Constraint& constraint, const Float dual)
+void TargetConflictSeparator::apply_in_pricer(const Constraint& constraint, const Real64 dual,
+                                              Pricer& pricer)
 {
     ZoneScopedC(TRACY_COLOUR);
 
     // Get the constraint data.
-    const auto& target_constraint = *static_cast<const TargetConstraint*>(&constraint);
-    const auto finishing_agent = target_constraint.finishing_agent;
-    const auto crossing_agent = target_constraint.crossing_agent;
-    const auto nt = target_constraint.nt;
+    const auto& [finishing_agent, crossing_agent, nt] =
+        *reinterpret_cast<const ConstraintData*>(constraint.data());
 
     // Add the penalty if the finishing agent finishes at or before time t.
-    auto& pricer = problem_.pricer();
     pricer.add_end_penalty_one_agent(finishing_agent, 0, nt.t + 1, -dual);
 
     // Add the penalty if the crossing agent visits the finshing agent's target at or after time t.
     pricer.add_once_off_penalty_one_agent(crossing_agent, nt, -dual);
 }
 
-Float TargetConflictSeparator::get_coeff(const Constraint& constraint, const Agent a, const Path& path)
+Real64 TargetConflictSeparator::get_coeff(const Constraint& constraint, const Agent a,
+                                          const Path& path)
 {
     ZoneScopedC(TRACY_COLOUR);
 
     // Get the constraint data.
-    const auto& target_constraint = *static_cast<const TargetConstraint*>(&constraint);
-    const auto finishing_agent = target_constraint.finishing_agent;
-    const auto crossing_agent = target_constraint.crossing_agent;
-    const auto nt = target_constraint.nt;
+    const auto& [finishing_agent, crossing_agent, nt] =
+        *reinterpret_cast<const ConstraintData*>(constraint.data());
 
     // Calculate coefficient.
     if (a == finishing_agent)
@@ -167,7 +161,7 @@ Float TargetConflictSeparator::get_coeff(const Constraint& constraint, const Age
     }
 }
 
-Float TargetConflictSeparator::calculate_finishing_agent_coeff(const NodeTime nt, const Path& path)
+Real64 TargetConflictSeparator::calculate_finishing_agent_coeff(const NodeTime nt, const Path& path)
 {
     ZoneScopedC(TRACY_COLOUR);
 
@@ -175,20 +169,21 @@ Float TargetConflictSeparator::calculate_finishing_agent_coeff(const NodeTime nt
     return (finishing_time <= nt.t);
 }
 
-Float TargetConflictSeparator::calculate_crossing_agent_coeff(const NodeTime nt, const Path& path)
+Real64 TargetConflictSeparator::calculate_crossing_agent_coeff(const NodeTime nt, const Path& path)
 {
     ZoneScopedC(TRACY_COLOUR);
 
     const Time finishing_time = path.size() - 1;
 
-    // Targets must be unique, so the crossing agent cannot finish at n, so no need to test <= finishing_time.
-    Float coeff = 0.0;
+    // Targets must be unique, so the crossing agent cannot finish at n, so no need to test <=
+    // finishing_time.
+    Real64 coeff = 0.0;
     for (Time t = nt.t; t < finishing_time; ++t)
         if (path[t].n == nt.n)
         {
             coeff = 1.0;
             break;
         }
-    debug_assert(path[finishing_time].n != nt.n);
+    DEBUG_ASSERT(path[finishing_time].n != nt.n);
     return coeff;
 }

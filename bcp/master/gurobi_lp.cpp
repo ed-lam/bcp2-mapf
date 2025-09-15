@@ -8,9 +8,10 @@ Author: Edward Lam <ed@ed-lam.com>
 // #define PRINT_DEBUG
 
 #include "master/gurobi_lp.h"
-#include "problem/debug.h"
+#include "types/debug.h"
 #include "types/float_compare.h"
 #include "types/tracy.h"
+#include <algorithm>
 
 #define TRACY_COLOUR tracy::Color::ColorType::Gold
 
@@ -20,7 +21,7 @@ GurobiLP::GurobiLP() :
     num_cols_(0),
     num_rows_(0),
 
-    obj_(INF),
+    obj_(COST_INF),
     primal_sol_(),
     dual_sol_(),
     row_slack_(),
@@ -34,27 +35,27 @@ GurobiLP::GurobiLP() :
 
     // Create environment.
     auto error = GRBloadenv(&env_, nullptr);
-    release_assert(!error, "Gurobi failed to create environment (error {})", error);
+    ASSERT(!error, "Gurobi failed to create environment (error {})", error);
 
     // Turn off logging.
     error = GRBsetintparam(env_, GRB_INT_PAR_OUTPUTFLAG, 0);
-    release_assert(!error, "Gurobi failed to turn off logging (error {})", error);
+    ASSERT(!error, "Gurobi failed to turn off logging (error {})", error);
 
     // Set number of threads.
     error = GRBsetintparam(env_, GRB_INT_PAR_THREADS, 1);
-    release_assert(!error, "Gurobi failed to set single thread (error {})", error);
+    ASSERT(!error, "Gurobi failed to set single thread (error {})", error);
 
     // Set to compute the Farkas certificate of infeasibility.
     error = GRBsetintparam(env_, GRB_INT_PAR_INFUNBDINFO, 1);
-    release_assert(!error, "Gurobi failed to turn on infeasibility proof (error {})", error);
+    ASSERT(!error, "Gurobi failed to turn on infeasibility proof (error {})", error);
 
     // Enable presolve when warm-starting from LP basis.
     // error = GRBsetintparam(env_, GRB_INT_PAR_LPWARMSTART, 2);
-    // release_assert(!error, "Gurobi failed to turn on warm-start presolving (error {})", error);
+    // ASSERT(!error, "Gurobi failed to turn on warm-start presolving (error {})", error);
 
     // Create an empty model.
     error = GRBnewmodel(env_, &model_, "master", 0, nullptr, nullptr, nullptr, nullptr, nullptr);
-    release_assert(!error, "Gurobi failed to create model (error {})", error);
+    ASSERT(!error, "Gurobi failed to create model (error {})", error);
 };
 
 GurobiLP::~GurobiLP()
@@ -63,7 +64,7 @@ GurobiLP::~GurobiLP()
 
     // Free model.
     const auto error = GRBfreemodel(model_);
-    release_assert(!error, "Gurobi failed to free model (error {})", error);
+    ASSERT(!error, "Gurobi failed to free model (error {})", error);
 
     // Free environment.
     GRBfreeenv(env_);
@@ -75,7 +76,7 @@ Value GurobiLP::col_lb(const ColumnIndex col) const
 
     Value val;
     const auto error = GRBgetdblattrelement(model_, GRB_DBL_ATTR_LB, col, &val);
-    release_assert(!error, "Gurobi failed to get variable domain lower bound (error {})", error);
+    ASSERT(!error, "Gurobi failed to get variable domain lower bound (error {})", error);
     return val;
 }
 
@@ -85,27 +86,27 @@ Value GurobiLP::col_ub(const ColumnIndex col) const
 
     Value val;
     const auto error = GRBgetdblattrelement(model_, GRB_DBL_ATTR_UB, col, &val);
-    release_assert(!error, "Gurobi failed to get variable domain upper bound (error {})", error);
+    ASSERT(!error, "Gurobi failed to get variable domain upper bound (error {})", error);
     return val;
 }
 
-Float GurobiLP::condition_number() const
+Real64 GurobiLP::condition_number() const
 {
     ZoneScopedC(TRACY_COLOUR);
 
-    Float kappa;
+    Real64 kappa;
     const auto error = GRBgetdblattr(model_, GRB_DBL_ATTR_KAPPA_EXACT, &kappa);
-    release_assert(!error, "Gurobi failed to get condition number (error {})", error);
+    ASSERT(!error, "Gurobi failed to get condition number (error {})", error);
     return kappa;
 }
 
-Float GurobiLP::approx_condition_number() const
+Real64 GurobiLP::approx_condition_number() const
 {
     ZoneScopedC(TRACY_COLOUR);
 
-    Float kappa;
+    Real64 kappa;
     const auto error = GRBgetdblattr(model_, GRB_DBL_ATTR_KAPPA, &kappa);
-    release_assert(!error, "Gurobi failed to get approximate condition number (error {})", error);
+    ASSERT(!error, "Gurobi failed to get approximate condition number (error {})", error);
     return kappa;
 }
 
@@ -116,7 +117,7 @@ String GurobiLP::col_name(const ColumnIndex col) const
 
     char* name;
     const auto error = GRBgetstrattrelement(model_, GRB_STR_ATTR_VARNAME, col, &name);
-    release_assert(!error, "Gurobi failed to get variable name (error {})", error);
+    ASSERT(!error, "Gurobi failed to get variable name (error {})", error);
 
     String val{name};
     return val;
@@ -128,7 +129,7 @@ String GurobiLP::row_name(const RowIndex row) const
 
     char* name;
     const auto error = GRBgetstrattrelement(model_, GRB_STR_ATTR_CONSTRNAME, row, &name);
-    release_assert(!error, "Gurobi failed to get constraint name (error {})", error);
+    ASSERT(!error, "Gurobi failed to get constraint name (error {})", error);
 
     String val{name};
     return val;
@@ -140,7 +141,7 @@ ColumnBasis GurobiLP::col_basis(const ColumnIndex col) const
 
     ColumnBasis basis;
     const auto error = GRBgetintattrelement(model_, GRB_INT_ATTR_VBASIS, col, &basis);
-    release_assert(!error, "Gurobi failed to get variable basis (error {})", error);
+    ASSERT(!error, "Gurobi failed to get variable basis (error {})", error);
     return basis;
 }
 
@@ -150,15 +151,13 @@ RowBasis GurobiLP::row_basis(const RowIndex row) const
 
     RowBasis basis;
     const auto error = GRBgetintattrelement(model_, GRB_INT_ATTR_CBASIS, row, &basis);
-    release_assert(!error, "Gurobi failed to get constraint basis (error {})", error);
+    ASSERT(!error, "Gurobi failed to get constraint basis (error {})", error);
     return basis;
 }
 #endif
 
-ColumnIndex GurobiLP::add_column(const Span<RowIndex>& rows,
-                                 const Span<Value>& coeffs,
-                                 const Cost obj,
-                                 const String& name)
+ColumnIndex GurobiLP::add_column(const Span<RowIndex>& rows, const Span<Value>& coeffs,
+                                 const Cost obj, const String& name)
 {
     ZoneScopedC(TRACY_COLOUR);
 
@@ -172,7 +171,7 @@ ColumnIndex GurobiLP::add_column(const Span<RowIndex>& rows,
                                  GRB_INFINITY,
                                  GRB_CONTINUOUS,
                                  name.c_str());
-    release_assert(!error, "Gurobi failed to add variable {} (error {})", name, error);
+    ASSERT(!error, "Gurobi failed to add variable {} (error {})", name, error);
 
     // Resize data structures.
     primal_sol_.push_back(0.0);
@@ -182,11 +181,8 @@ ColumnIndex GurobiLP::add_column(const Span<RowIndex>& rows,
     return num_cols_++;
 }
 
-RowIndex GurobiLP::add_row(const Span<ColumnIndex>& cols,
-                           const Span<Value>& coeffs,
-                           const Sign sign,
-                           const Float rhs,
-                           const String& name)
+RowIndex GurobiLP::add_row(const Span<ColumnIndex>& cols, const Span<Value>& coeffs,
+                           const Sign sign, const Real64 rhs, const String& name)
 {
     ZoneScopedC(TRACY_COLOUR);
 
@@ -198,7 +194,7 @@ RowIndex GurobiLP::add_row(const Span<ColumnIndex>& cols,
                                     sign,
                                     rhs,
                                     name.c_str());
-    release_assert(!error, "Gurobi failed to add constraint {} (error {})", name, error);
+    ASSERT(!error, "Gurobi failed to add constraint {} (error {})", name, error);
 
     // Resize data structures.
     dual_sol_.push_back(0.0);
@@ -213,18 +209,20 @@ void GurobiLP::enable_columns()
 {
     ZoneScopedC(TRACY_COLOUR);
 
-    temp_infinity_.resize(std::max<Size>(temp_infinity_.size(), num_cols_), GRB_INFINITY);
-    const auto error = GRBsetdblattrarray(model_, GRB_DBL_ATTR_UB, 0, num_cols_, temp_infinity_.data());
-    release_assert(!error, "Gurobi failed to reset variable domains (error {})", error);
+    temp_infinity_.resize(std::max<Size64>(temp_infinity_.size(), num_cols_), GRB_INFINITY);
+    const auto error =
+        GRBsetdblattrarray(model_, GRB_DBL_ATTR_UB, 0, num_cols_, temp_infinity_.data());
+    ASSERT(!error, "Gurobi failed to reset variable domains (error {})", error);
 }
 
 void GurobiLP::disable_columns(const Span<ColumnIndex>& cols)
 {
     ZoneScopedC(TRACY_COLOUR);
 
-    temp_zero_.resize(std::max<Size>(temp_zero_.size(), cols.size()), 0.0);
-    const auto error = GRBsetdblattrlist(model_, GRB_DBL_ATTR_UB, cols.size(), cols.data(), temp_zero_.data());
-    release_assert(!error, "Gurobi failed to fix variable values to 0 (error {})", error);
+    temp_zero_.resize(std::max<Size64>(temp_zero_.size(), cols.size()), 0.0);
+    const auto error =
+        GRBsetdblattrlist(model_, GRB_DBL_ATTR_UB, cols.size(), cols.data(), temp_zero_.data());
+    ASSERT(!error, "Gurobi failed to fix variable values to 0 (error {})", error);
 }
 
 void GurobiLP::delete_columns(const Span<ColumnIndex>& cols)
@@ -236,8 +234,9 @@ void GurobiLP::delete_columns(const Span<ColumnIndex>& cols)
     {
         ColumnIndex num_cols = 0;
         const auto error = GRBgetintattr(model_, GRB_INT_ATTR_NUMVARS, &num_cols);
-        release_assert(!error, "Gurobi failed to check number of variables before deletion (error {})", error);
-        debug_assert(num_cols == num_cols_);
+        ASSERT(
+            !error, "Gurobi failed to check number of variables before deletion (error {})", error);
+        DEBUG_ASSERT(num_cols == num_cols_);
     }
 #endif
 
@@ -249,11 +248,11 @@ void GurobiLP::delete_columns(const Span<ColumnIndex>& cols)
 
     // Delete the columns from the model.
     const auto error = GRBdelvars(model_, cols.size(), const_cast<ColumnIndex*>(cols.data()));
-    release_assert(!error, "Gurobi failed to delete variables (error {})", error);
+    ASSERT(!error, "Gurobi failed to delete variables (error {})", error);
 
     // Delete solution data.
-    debug_assert(primal_sol_.size() == num_cols_);
-    debug_assert(col_basis_.size() == num_cols_);
+    DEBUG_ASSERT(primal_sol_.size() == num_cols_);
+    DEBUG_ASSERT(col_basis_.size() == num_cols_);
     num_cols_ -= cols.size();
     for (const auto col : cols)
     {
@@ -262,8 +261,8 @@ void GurobiLP::delete_columns(const Span<ColumnIndex>& cols)
     }
     std::erase(primal_sol_, std::numeric_limits<Value>::max());
     std::erase(col_basis_, std::numeric_limits<ColumnBasis>::max());
-    debug_assert(primal_sol_.size() == num_cols_);
-    debug_assert(col_basis_.size() == num_cols_);
+    DEBUG_ASSERT(primal_sol_.size() == num_cols_);
+    DEBUG_ASSERT(col_basis_.size() == num_cols_);
 }
 
 void GurobiLP::delete_rows(const Span<RowIndex>& rows)
@@ -275,8 +274,10 @@ void GurobiLP::delete_rows(const Span<RowIndex>& rows)
     {
         RowIndex num_rows = 0;
         const auto error = GRBgetintattr(model_, GRB_INT_ATTR_NUMCONSTRS, &num_rows);
-        release_assert(!error, "Gurobi failed to check number of constraints before deletion (error {})", error);
-        debug_assert(num_rows == num_rows_);
+        ASSERT(!error,
+               "Gurobi failed to check number of constraints before deletion (error {})",
+               error);
+        DEBUG_ASSERT(num_rows == num_rows_);
     }
 #endif
 
@@ -288,12 +289,12 @@ void GurobiLP::delete_rows(const Span<RowIndex>& rows)
 
     // Delete the rows from the model.
     const auto error = GRBdelconstrs(model_, rows.size(), const_cast<RowIndex*>(rows.data()));
-    release_assert(!error, "Gurobi failed to delete constraints (error {})", error);
+    ASSERT(!error, "Gurobi failed to delete constraints (error {})", error);
 
     // Delete solution data.
-    debug_assert(dual_sol_.size() == num_rows_);
-    debug_assert(row_slack_.size() == num_rows_);
-    debug_assert(row_basis_.size() == num_rows_);
+    DEBUG_ASSERT(dual_sol_.size() == num_rows_);
+    DEBUG_ASSERT(row_slack_.size() == num_rows_);
+    DEBUG_ASSERT(row_basis_.size() == num_rows_);
     num_rows_ -= rows.size();
     for (const auto row : rows)
     {
@@ -304,9 +305,9 @@ void GurobiLP::delete_rows(const Span<RowIndex>& rows)
     std::erase(dual_sol_, std::numeric_limits<Value>::max());
     std::erase(row_slack_, std::numeric_limits<Value>::max());
     std::erase(row_basis_, std::numeric_limits<RowBasis>::max());
-    debug_assert(dual_sol_.size() == num_rows_);
-    debug_assert(row_slack_.size() == num_rows_);
-    debug_assert(row_basis_.size() == num_rows_);
+    DEBUG_ASSERT(dual_sol_.size() == num_rows_);
+    DEBUG_ASSERT(row_slack_.size() == num_rows_);
+    DEBUG_ASSERT(row_basis_.size() == num_rows_);
 }
 
 void GurobiLP::update()
@@ -314,53 +315,47 @@ void GurobiLP::update()
     ZoneScopedC(TRACY_COLOUR);
 
     const auto error = GRBupdatemodel(model_);
-    release_assert(!error, "Gurobi failed to update model (error {})", error);
+    ASSERT(!error, "Gurobi failed to update model (error {})", error);
 }
 
 void GurobiLP::set_col_basis(const Span<ColumnBasis>& basis)
 {
     ZoneScopedC(TRACY_COLOUR);
 
-    const auto error = GRBsetintattrarray(model_,
-                                          GRB_INT_ATTR_VBASIS,
-                                          0,
-                                          basis.size(),
-                                          const_cast<ColumnBasis*>(basis.data()));
-    release_assert(!error, "Gurobi failed to set column basis (error {})", error);
+    const auto error = GRBsetintattrarray(
+        model_, GRB_INT_ATTR_VBASIS, 0, basis.size(), const_cast<ColumnBasis*>(basis.data()));
+    ASSERT(!error, "Gurobi failed to set column basis (error {})", error);
 }
 
 void GurobiLP::set_row_basis(const Span<RowBasis>& basis)
 {
     ZoneScopedC(TRACY_COLOUR);
 
-    const auto error = GRBsetintattrarray(model_,
-                                          GRB_INT_ATTR_CBASIS,
-                                          0,
-                                          basis.size(),
-                                          const_cast<RowBasis*>(basis.data()));
-    release_assert(!error, "Gurobi failed to set row basis (error {})", error);
+    const auto error = GRBsetintattrarray(
+        model_, GRB_INT_ATTR_CBASIS, 0, basis.size(), const_cast<RowBasis*>(basis.data()));
+    ASSERT(!error, "Gurobi failed to set row basis (error {})", error);
 }
 
-LPStatus GurobiLP::solve(const LPAlgorithm algorithm, const Float time_limit)
+LPStatus GurobiLP::solve(const LPAlgorithm algorithm, const Real64 time_limit)
 {
     ZoneScopedC(TRACY_COLOUR);
 
     // Set method/algorithm.
     auto error = GRBsetintparam(GRBgetenv(model_), GRB_INT_PAR_METHOD, static_cast<int>(algorithm));
-    release_assert(!error, "Gurobi failed to set algorithm (error {})", error);
+    ASSERT(!error, "Gurobi failed to set algorithm (error {})", error);
 
     // Set time limit.
     error = GRBsetdblparam(GRBgetenv(model_), GRB_DBL_PAR_TIMELIMIT, time_limit + 0.5);
-    release_assert(!error, "Gurobi failed to set time limit (error {})", error);
+    ASSERT(!error, "Gurobi failed to set time limit (error {})", error);
 
     // Solve.
     error = GRBoptimize(model_);
-    release_assert(!error, "Gurobi failed to solve (error {})", error);
+    ASSERT(!error, "Gurobi failed to solve (error {})", error);
 
     // Get the status.
     int lp_status;
     error = GRBgetintattr(model_, GRB_INT_ATTR_STATUS, &lp_status);
-    release_assert(!error, "Gurobi failed to get solving status (error {})", error);
+    ASSERT(!error, "Gurobi failed to get solving status (error {})", error);
 
     // Check.
 #ifdef DEBUG
@@ -368,66 +363,76 @@ LPStatus GurobiLP::solve(const LPAlgorithm algorithm, const Float time_limit)
         // Get number of variables.
         ColumnIndex num_cols = 0;
         auto error = GRBgetintattr(model_, GRB_INT_ATTR_NUMVARS, &num_cols);
-        release_assert(!error, "Gurobi failed to get number of variables after solving (error {})", error);
-        debug_assert(num_cols == num_cols_);
+        ASSERT(!error, "Gurobi failed to get number of variables after solving (error {})", error);
+        DEBUG_ASSERT(num_cols == num_cols_);
 
         // Get number of constraints.
         RowIndex num_rows = 0;
         error = GRBgetintattr(model_, GRB_INT_ATTR_NUMCONSTRS, &num_rows);
-        release_assert(!error, "Gurobi failed to get number of constraints after solving (error {})", error);
-        debug_assert(num_rows == num_rows_);
+        ASSERT(
+            !error, "Gurobi failed to get number of constraints after solving (error {})", error);
+        DEBUG_ASSERT(num_rows == num_rows_);
     }
 #endif
 
     // Get the solution.
-    debug_assert(primal_sol_.size() == num_cols_);
-    debug_assert(dual_sol_.size() == num_rows_);
-    debug_assert(row_slack_.size() == num_rows_);
-    debug_assert(col_basis_.size() == num_cols_);
-    debug_assert(row_basis_.size() == num_rows_);
+    DEBUG_ASSERT(primal_sol_.size() == num_cols_);
+    DEBUG_ASSERT(dual_sol_.size() == num_rows_);
+    DEBUG_ASSERT(row_slack_.size() == num_rows_);
+    DEBUG_ASSERT(col_basis_.size() == num_cols_);
+    DEBUG_ASSERT(row_basis_.size() == num_rows_);
     if (lp_status == GRB_OPTIMAL)
     {
         // Store objective value.
         error = GRBgetdblattr(model_, GRB_DBL_ATTR_OBJVAL, &obj_);
-        release_assert(!error, "Gurobi failed to get objective value (error {})", error);
+        ASSERT(!error, "Gurobi failed to get objective value (error {})", error);
 
         // Store primal solution and zero-out near zero values.
         error = GRBgetdblattrarray(model_, GRB_DBL_ATTR_X, 0, num_cols_, primal_sol_.data());
-        release_assert(!error, "Gurobi failed to get primal solution (error {})", error);
-        for (auto& x : primal_sol_) { x *= is_ne(x, 0.0); }
+        ASSERT(!error, "Gurobi failed to get primal solution (error {})", error);
+        for (auto& x : primal_sol_)
+        {
+            x *= is_ne(x, 0.0);
+        }
 
         // Store dual solution and zero-out near zero values.
         error = GRBgetdblattrarray(model_, GRB_DBL_ATTR_PI, 0, num_rows_, dual_sol_.data());
-        release_assert(!error, "Gurobi failed to get dual solution (error {})", error);
-        for (auto& x : dual_sol_) { x *= is_ne(x, 0.0); }
+        ASSERT(!error, "Gurobi failed to get dual solution (error {})", error);
+        for (auto& x : dual_sol_)
+        {
+            x *= is_ne(x, 0.0);
+        }
 
         // Store the row slack values and zero-out near zero values.
         error = GRBgetdblattrarray(model_, GRB_DBL_ATTR_SLACK, 0, num_rows_, row_slack_.data());
-        release_assert(!error, "Gurobi failed to get constraint slack values (error {})", error);
-        for (auto& x : row_slack_) { x *= is_ne(x, 0.0); }
+        ASSERT(!error, "Gurobi failed to get constraint slack values (error {})", error);
+        for (auto& x : row_slack_)
+        {
+            x *= is_ne(x, 0.0);
+        }
 
         // Store the column basis.
         error = GRBgetintattrarray(model_, GRB_INT_ATTR_VBASIS, 0, num_cols_, col_basis_.data());
-        release_assert(!error, "Gurobi failed to get column basis (error {})", error);
+        ASSERT(!error, "Gurobi failed to get column basis (error {})", error);
 #ifdef DEBUG
         for (ColumnIndex col = 0; col < num_cols_; ++col)
         {
             const auto basis = col_basis_[col];
             const auto val = primal_sol_[col];
-            debug_assert(basis >= -2);
-            debug_assert(basis == 0 || is_eq(val, 0.0));
+            DEBUG_ASSERT(basis >= -2);
+            DEBUG_ASSERT(basis == 0 || is_eq(val, 0.0));
         }
 #endif
 
         // Store the row basis.
         error = GRBgetintattrarray(model_, GRB_INT_ATTR_CBASIS, 0, num_rows_, row_basis_.data());
-        release_assert(!error, "Gurobi failed to get row basis (error {})", error);
+        ASSERT(!error, "Gurobi failed to get row basis (error {})", error);
 #ifdef DEBUG
         for (RowIndex row = 0; row < num_rows_; ++row)
         {
             const auto basis = row_basis_[row];
             const auto slack = row_slack_[row];
-            debug_assert(basis == 0 || is_eq(slack, 0.0));
+            DEBUG_ASSERT(basis == 0 || is_eq(slack, 0.0));
         }
 #endif
     }
@@ -438,12 +443,15 @@ LPStatus GurobiLP::solve(const LPAlgorithm algorithm, const Float time_limit)
 
         // Store primal solution.
         std::fill(primal_sol_.begin(), primal_sol_.end(), std::numeric_limits<Value>::quiet_NaN());
-        for (auto& x : primal_sol_) { x *= is_ne(x, 0.0); }
 
-        // Store dual solution and zero-out near zero values. Also negate because Gurobi outputs the opposite sign.
+        // Store dual solution and zero-out near zero values. Also negate because Gurobi outputs the
+        // opposite sign.
         error = GRBgetdblattrarray(model_, GRB_DBL_ATTR_FARKASDUAL, 0, num_rows_, dual_sol_.data());
-        release_assert(!error, "Gurobi failed to get Farkas certificate (error {})", error);
-        for (auto& x : dual_sol_) { x *= -static_cast<Value>(is_ne(x, 0.0)); }
+        ASSERT(!error, "Gurobi failed to get Farkas certificate (error {})", error);
+        for (auto& x : dual_sol_)
+        {
+            x *= -static_cast<Value>(is_ne(x, 0.0));
+        }
 
         // Store the row slack values.
         std::fill(row_slack_.begin(), row_slack_.end(), 0.0);
@@ -452,10 +460,14 @@ LPStatus GurobiLP::solve(const LPAlgorithm algorithm, const Float time_limit)
     // Return status.
     switch (lp_status)
     {
-        case GRB_OPTIMAL:    return LPStatus::Optimal;
-        case GRB_UNBOUNDED:  return LPStatus::Unbounded;
-        case GRB_INFEASIBLE: return LPStatus::Infeasible;
-        default:             return LPStatus::Unknown;
+        case GRB_OPTIMAL:
+            return LPStatus::Optimal;
+        case GRB_UNBOUNDED:
+            return LPStatus::Unbounded;
+        case GRB_INFEASIBLE:
+            return LPStatus::Infeasible;
+        default:
+            return LPStatus::Unknown;
     };
 }
 
@@ -466,7 +478,7 @@ void GurobiLP::reset()
     ZoneScopedC(TRACY_COLOUR);
 
     const auto error = GRBreset(model_, 1);
-    release_assert(!error, "Gurobi failed to reset model (error {})", error);
+    ASSERT(!error, "Gurobi failed to reset model (error {})", error);
 }
 
 void GurobiLP::print()
@@ -476,7 +488,7 @@ void GurobiLP::print()
     // Get the status.
     int lp_status;
     auto error = GRBgetintattr(model_, GRB_INT_ATTR_STATUS, &lp_status);
-    release_assert(!error, "Gurobi failed to get solving status for printing (error {})", error);
+    ASSERT(!error, "Gurobi failed to get solving status for printing (error {})", error);
 
     // Print.
     if (lp_status == GRB_OPTIMAL)
@@ -484,33 +496,37 @@ void GurobiLP::print()
         // Get number of variables.
         ColumnIndex num_cols = 0;
         auto error = GRBgetintattr(model_, GRB_INT_ATTR_NUMVARS, &num_cols);
-        release_assert(!error, "Gurobi failed to get number of variables for printing (error {})", error);
+        ASSERT(!error, "Gurobi failed to get number of variables for printing (error {})", error);
 
         // Get number of constraints.
         RowIndex num_rows = 0;
         error = GRBgetintattr(model_, GRB_INT_ATTR_NUMCONSTRS, &num_rows);
-        release_assert(!error, "Gurobi failed to get number of constraints for printing (error {})", error);
+        ASSERT(!error, "Gurobi failed to get number of constraints for printing (error {})", error);
 
         // Print columns.
         for (ColumnIndex col = 0; col < num_cols; ++col)
         {
             Value value = std::numeric_limits<Value>::quiet_NaN();
             error = GRBgetdblattrelement(model_, GRB_DBL_ATTR_X, col, &value);
-            release_assert(!error, "Gurobi failed to get variable values for printing (error {})", error);
+            ASSERT(!error, "Gurobi failed to get variable values for printing (error {})", error);
 
             Value lb = std::numeric_limits<Value>::quiet_NaN();
             error = GRBgetdblattrelement(model_, GRB_DBL_ATTR_LB, col, &lb);
-            release_assert(!error, "Gurobi failed to get variable domain lower bounds for printing (error {})", error);
+            ASSERT(!error,
+                   "Gurobi failed to get variable domain lower bounds for printing (error {})",
+                   error);
 
             Value ub = std::numeric_limits<Value>::quiet_NaN();
             error = GRBgetdblattrelement(model_, GRB_DBL_ATTR_UB, col, &ub);
-            release_assert(!error, "Gurobi failed to get variable domain upper bounds for printing (error {})", error);
+            ASSERT(!error,
+                   "Gurobi failed to get variable domain upper bounds for printing (error {})",
+                   error);
 
             char* name = nullptr;
             error = GRBgetstrattrelement(model_, GRB_STR_ATTR_VARNAME, col, &name);
-            release_assert(!error, "Gurobi failed to get variable names for printing (error {})", error);
+            ASSERT(!error, "Gurobi failed to get variable names for printing (error {})", error);
 
-            println("Variable {}, value {}, lb {}, ub {}", name, value, lb, ub);
+            PRINTLN("Variable {}, value {}, lb {}, ub {}", name, value, lb, ub);
         }
 
         // Print rows.
@@ -518,13 +534,15 @@ void GurobiLP::print()
         {
             Value dual = std::numeric_limits<Value>::quiet_NaN();
             error = GRBgetdblattrelement(model_, GRB_DBL_ATTR_PI, row, &dual);
-            release_assert(!error, "Gurobi failed to get constraint dual value for printing (error {})", error);
+            ASSERT(!error,
+                   "Gurobi failed to get constraint dual value for printing (error {})",
+                   error);
 
             char* name = nullptr;
             error = GRBgetstrattrelement(model_, GRB_STR_ATTR_CONSTRNAME, row, &name);
-            release_assert(!error, "Gurobi failed to get constraint name for printing (error {})", error);
+            ASSERT(!error, "Gurobi failed to get constraint name for printing (error {})", error);
 
-            println("Constraint {}, dual {}", name, dual);
+            PRINTLN("Constraint {}, dual {}", name, dual);
         }
     }
     else if (lp_status == GRB_INFEASIBLE)
@@ -532,21 +550,23 @@ void GurobiLP::print()
         // Get number of constraints.
         RowIndex num_rows = 0;
         error = GRBgetintattr(model_, GRB_INT_ATTR_NUMCONSTRS, &num_rows);
-        release_assert(!error, "Gurobi failed to get number of constraints for printing (error {})", error);
+        ASSERT(!error, "Gurobi failed to get number of constraints for printing (error {})", error);
 
         // Print rows.
         for (RowIndex row = 0; row < num_rows; ++row)
         {
             Value dual = std::numeric_limits<Value>::quiet_NaN();
             error = GRBgetdblattrelement(model_, GRB_DBL_ATTR_FARKASDUAL, row, &dual);
-            release_assert(!error, "Gurobi failed to get constraint Farkas certificate for printing (error {})", error);
+            ASSERT(!error,
+                   "Gurobi failed to get constraint Farkas certificate for printing (error {})",
+                   error);
             dual *= -1;
 
             char* name = nullptr;
             error = GRBgetstrattrelement(model_, GRB_STR_ATTR_CONSTRNAME, row, &name);
-            release_assert(!error, "Gurobi failed to get constraint name for printing (error {})", error);
+            ASSERT(!error, "Gurobi failed to get constraint name for printing (error {})", error);
 
-            println("Constraint {}, Farkas dual {}", name, dual);
+            PRINTLN("Constraint {}, Farkas dual {}", name, dual);
         }
     }
 }
@@ -558,12 +578,12 @@ void GurobiLP::write()
     static int num = 0;
     const auto filename = fmt::format("gurobi_{}.lp", num++);
     const auto error = GRBwrite(model_, filename.c_str());
-    release_assert(!error, "Gurobi failed to save model (error {})", error);
+    ASSERT(!error, "Gurobi failed to save model (error {})", error);
 }
 
 void GurobiLP::set_verbose(const Bool verbose)
 {
     const auto error = GRBsetintparam(GRBgetenv(model_), GRB_INT_PAR_OUTPUTFLAG, verbose);
-    release_assert(!error, "Gurobi failed to set logging (error {})", error);
+    ASSERT(!error, "Gurobi failed to set logging (error {})", error);
 }
 #endif

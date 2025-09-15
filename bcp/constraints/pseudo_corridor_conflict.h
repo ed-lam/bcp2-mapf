@@ -15,7 +15,7 @@ Author: Edward Lam <ed@ed-lam.com>
 
 class PseudoCorridorConflictSeparator : public Separator
 {
-    struct PseudoCorridorConstraint : public Constraint
+    struct ConstraintData
     {
         Agent a1;
         Agent a2;
@@ -24,7 +24,7 @@ class PseudoCorridorConflictSeparator : public Separator
     };
     struct PseudoCorridorConstraintCandidate
     {
-        Float lhs;
+        Real64 lhs;
         Agent a1;
         Agent a2;
         Array<EdgeTime, 4> a1_ets;
@@ -33,7 +33,7 @@ class PseudoCorridorConflictSeparator : public Separator
 
     // Helper data
     Vector<PseudoCorridorConstraintCandidate> candidates_;
-    Matrix<UInt8> num_separated_;
+    Matrix<UInt16> num_separated_;
 
   public:
     // Constructors and destructor
@@ -41,16 +41,19 @@ class PseudoCorridorConflictSeparator : public Separator
     PseudoCorridorConflictSeparator(const Instance& instance, Problem& problem);
 
     // Separator type
-    constexpr static auto name() { return "Pseudo-corridor"; }
+    constexpr static auto name()
+    {
+        return "Pseudo-corridor";
+    }
 
     // Separate
     void separate();
 
     // Add dual solution to pricing costs
-    void add_pricing_costs(const Constraint& constraint, const Float dual);
+    static void apply_in_pricer(const Constraint& constraint, const Real64 dual, Pricer& pricer);
 
     // Add coefficient to a column
-    Float get_coeff(const Constraint& constraint, const Agent a, const Path& path);
+    static Real64 get_coeff(const Constraint& constraint, const Agent a, const Path& path);
 
   private:
     static Bool calculate_a1_coeff(const Array<EdgeTime, 4>& ets, const Path& path);

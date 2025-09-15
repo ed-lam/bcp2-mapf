@@ -55,7 +55,7 @@ Vector<PricingTask>& PartialPricing::agents_order()
         Agent a = 0;
         for (const auto& constraint : master_.convexity_constraints())
         {
-            debug_assert(a < A && constraint.name() == fmt::format("agent({})", a));
+            DEBUG_ASSERT(a < A && constraint.name() == fmt::format("agent({})", a));
             const auto dual = master_.constraint_dual_sol(constraint);
             pricing_tasks_[a] = {a, is_gt(dual, 0.0), &pricing_priority_[a]};
             ++a;
@@ -63,11 +63,12 @@ Vector<PricingTask>& PartialPricing::agents_order()
     }
     else if (status == MasterProblemStatus::Fractional)
     {
-        // Price all agents whose convexity constraint has positive dual solution and the agent has fractional value.
+        // Price all agents whose convexity constraint has positive dual solution and the agent has
+        // fractional value.
         Agent a = 0;
         for (const auto& constraint : master_.convexity_constraints())
         {
-            debug_assert(a < A && constraint.name() == fmt::format("agent({})", a));
+            DEBUG_ASSERT(a < A && constraint.name() == fmt::format("agent({})", a));
             pricing_tasks_[a] = {a, false, &pricing_priority_[a]};
             const auto dual = master_.constraint_dual_sol(constraint);
             if (is_gt(dual, 0.0))
@@ -87,7 +88,7 @@ Vector<PricingTask>& PartialPricing::agents_order()
     }
     else
     {
-        err("Invalid master problem status {}", static_cast<Int32>(status));
+        ERROR("Invalid master problem status {}", static_cast<Int32>(status));
     }
 
     // Sort.
@@ -95,7 +96,8 @@ Vector<PricingTask>& PartialPricing::agents_order()
               pricing_tasks_.end(),
               [](const PricingTask& task1, const PricingTask& task2)
               {
-                  return std::tie(task1.must_price, *task1.priority) > std::tie(task2.must_price, *task2.priority);
+                  return std::tie(task1.must_price, *task1.priority) >
+                         std::tie(task2.must_price, *task2.priority);
               });
 
     // Decay pricing priority.

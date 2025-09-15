@@ -7,8 +7,9 @@ Author: Edward Lam <ed@ed-lam.com>
 
 // #define PRINT_DEBUG
 
-#include "problem/problem.h"
 #include "problem/projection.h"
+#include "problem/problem.h"
+#include "types/debug.h"
 #include "types/float_compare.h"
 #include "types/tracy.h"
 
@@ -33,7 +34,7 @@ Projection::Projection(const Instance& instance, Problem& problem) :
     agent_target_finishing_(),
     agent_target_crossing_(),
 
-    memory_pool_(),
+    arena_(),
     zeros_(nullptr),
     list_fractional_nodetimes_(),
     list_fractional_edgetimes_(),
@@ -87,15 +88,16 @@ void Projection::clear()
     }
     summed_nodetimes_.clear();
     summed_undirected_edgetimes_.clear();
-    // target_finishing_ stores pointers to agent_target_finishing_ in the initialisation, so no need to clear.
+    // target_finishing_ stores pointers to agent_target_finishing_ in the initialisation, so no
+    // need to clear.
     for (auto& [_, finish_times] : agent_target_finishing_)
     {
         finish_times.resize(1);
-        debug_assert(finish_times[0] == 0.0);
+        DEBUG_ASSERT(finish_times[0] == 0.0);
     }
     agent_target_crossing_.clear();
-    memory_pool_.reset(sizeof(Float) * (A + 1));
-    zeros_ = static_cast<ProjectionValues*>(memory_pool_.get_buffer<true, true>());
+    arena_.reset(sizeof(Real64) * (A + 1));
+    zeros_ = new (arena_.get_buffer<true, true>()) ProjectionValues;
     list_fractional_nodetimes_.clear();
     list_fractional_edgetimes_.clear();
     // No need to clear list_target_finish_ because it is overwritten.
@@ -124,7 +126,9 @@ void Projection::compute()
                 {
                     const auto& path = variable.path();
 
-                    std::fill(latest_target_crossing_times_.begin(), latest_target_crossing_times_.end(), -1);
+                    std::fill(latest_target_crossing_times_.begin(),
+                              latest_target_crossing_times_.end(),
+                              -1);
                     Time t = 0;
                     for (; t < path.size() - 1; ++t)
                     {
@@ -134,7 +138,8 @@ void Projection::compute()
                         agent_nodetimes_[a][nt] += val;
                         agent_edgetimes_[a][et] += val;
 
-                        if (const auto it = target_finishing_.find(nt.n); it != target_finishing_.end())
+                        if (const auto it = target_finishing_.find(nt.n);
+                            it != target_finishing_.end())
                         {
                             const auto finishing_agent = it->second.first;
                             latest_target_crossing_times_[finishing_agent] =
@@ -150,7 +155,7 @@ void Projection::compute()
 
                         ++t;
                         auto& finish_times = agent_target_finishing_[{a, nt.n}];
-                        finish_times.resize(std::max<Size>(finish_times.size(), t + 1));
+                        finish_times.resize(std::max<Size64>(finish_times.size(), t + 1));
                         finish_times[t] += val;
                     }
                     for (Agent finishing_agent = 0; finishing_agent < A; ++finishing_agent)
@@ -159,7 +164,7 @@ void Projection::compute()
                         if (finishing_agent != a && t > 0)
                         {
                             auto& crossing_times = pair_target_crossing_vals_[{a, finishing_agent}];
-                            crossing_times.resize(std::max<Size>(crossing_times.size(), t + 1));
+                            crossing_times.resize(std::max<Size64>(crossing_times.size(), t + 1));
                             crossing_times[t] += val;
                         }
                     }
@@ -174,7 +179,7 @@ void Projection::compute()
             for (const auto& [et, val] : agent_edgetimes_[a])
                 if (et.d != Direction::WAIT)
                 {
-                    const EdgeTime undirected_et{map.get_undirected_edge(et.et.e), et.t};
+                    const EdgeTime undirected_et{map.get_undirected_edge(et.e()), et.t};
                     summed_undirected_edgetimes_[undirected_et] += val;
                 }
         }
@@ -184,7 +189,7 @@ void Projection::compute()
 #ifdef DEBUG
     for (const auto& [nt, val] : summed_nodetimes_)
     {
-        Float check_val = 0.0;
+        Real64 check_val = 0.0;
         for (Agent a = 0; a < A; ++a)
             for (const auto& variable : master_.agent_variables(a))
             {
@@ -192,7 +197,7 @@ void Projection::compute()
                 const auto var_val = master_.variable_primal_sol(variable);
                 check_val += (nt.t < path.size() && path[nt.t].n == nt.n) * var_val;
             }
-        debug_assert(is_eq(check_val, val));
+        DEBUG_ASSERT(is_eq(check_val, val));
     }
 #endif
 
@@ -203,7 +208,7 @@ void Projection::compute()
         for (Agent a = 0; a < A; ++a)
             for (const auto& [nt, val] : agent_nodetimes_[a])
             {
-                debug_assert(is_gt(val, 0.0));
+                DEBUG_ASSERT(is_gt(val, 0.0));
 #ifdef PROJECT_FRACTIONAL_ONLY
                 if (is_lt(val, 1.0))
 #endif
@@ -212,8 +217,8 @@ void Projection::compute()
                     auto& agent_vals = it->second;
                     if (created)
                     {
-                        debug_assert(!agent_vals);
-                        agent_vals = static_cast<ProjectionValues*>(memory_pool_.get_buffer<true, true>());
+                        DEBUG_ASSERT(!agent_vals);
+                        agent_vals = new (arena_.get_buffer<true, true>()) ProjectionValues;
                     }
                     agent_vals->total += val;
                     agent_vals->agent[a] += val;
@@ -222,7 +227,7 @@ void Projection::compute()
         for (Agent a = 0; a < A; ++a)
             for (const auto& [et, val] : agent_edgetimes_[a])
             {
-                debug_assert(is_gt(val, 0.0));
+                DEBUG_ASSERT(is_gt(val, 0.0));
 #ifdef PROJECT_FRACTIONAL_ONLY
                 if (is_lt(val, 1.0))
 #endif
@@ -231,8 +236,8 @@ void Projection::compute()
                     auto& agent_vals = it->second;
                     if (created)
                     {
-                        debug_assert(!agent_vals);
-                        agent_vals = static_cast<ProjectionValues*>(memory_pool_.get_buffer<true, true>());
+                        DEBUG_ASSERT(!agent_vals);
+                        agent_vals = new (arena_.get_buffer<true, true>()) ProjectionValues;
                     }
                     agent_vals->total += val;
                     agent_vals->agent[a] += val;
@@ -246,7 +251,7 @@ void Projection::compute()
         for (auto& [an, finish_times] : agent_target_finishing_)
         {
             // Sum the finishing time values.
-            debug_assert(finish_times.size() >= 2);
+            DEBUG_ASSERT(finish_times.size() >= 2);
             for (Time t = 1; t < finish_times.size(); ++t)
             {
                 finish_times[t] += finish_times[t - 1];
@@ -266,7 +271,7 @@ void Projection::compute()
                 }
                 else if (t == 0 || finish_times[t] != finish_times[t - 1])
                 {
-                    finish_time_list = static_cast<ProjectionValues*>(memory_pool_.get_buffer<true, true>());
+                    finish_time_list = new (arena_.get_buffer<true, true>()) ProjectionValues;
                     finish_time_list->total = finish_times[t];
                     finish_time_list->agent[a] = finish_times[t];
                 }
@@ -286,8 +291,8 @@ void Projection::compute()
             const auto finishing_agent = aa.a2;
             const auto target = instance_.agents[finishing_agent].target;
 
-            debug_assert(crossing_times.size() > 0);
-            Float cum_sum = 0.0;
+            DEBUG_ASSERT(crossing_times.size() > 0);
+            Real64 cum_sum = 0.0;
             for (Time t = crossing_times.size() - 1; t >= 0; --t)
                 if (crossing_times[t])
                 {
@@ -303,19 +308,21 @@ void Projection::compute()
         for (Agent a = 0; a < A; ++a)
         {
             for (auto& [nt, val] : agent_nodetimes_[a])
-                if (const auto it = agent_target_finishing_.find({a, nt.n}); it != agent_target_finishing_.end())
+                if (const auto it = agent_target_finishing_.find({a, nt.n});
+                    it != agent_target_finishing_.end())
                 {
                     const auto& finish_times = it->second;
-                    debug_assert(finish_times.size() >= 1);
+                    DEBUG_ASSERT(finish_times.size() >= 1);
                     const auto t = std::min<Time>(finish_times.size() - 1, nt.t);
                     val += finish_times[t];
                 }
             for (auto& [et, val] : agent_edgetimes_[a])
                 if (et.d == Direction::WAIT)
-                    if (const auto it = agent_target_finishing_.find({a, et.n}); it != agent_target_finishing_.end())
+                    if (const auto it = agent_target_finishing_.find({a, et.n});
+                        it != agent_target_finishing_.end())
                     {
                         const auto& finish_times = it->second;
-                        debug_assert(finish_times.size() >= 1);
+                        DEBUG_ASSERT(finish_times.size() >= 1);
                         const auto t = std::min<Time>(finish_times.size() - 1, et.t);
                         val += finish_times[t];
                     }
@@ -324,7 +331,7 @@ void Projection::compute()
             if (const auto it = target_finishing_.find(nt.n); it != target_finishing_.end())
             {
                 const auto& finish_times = *it->second.second;
-                debug_assert(finish_times.size() >= 1);
+                DEBUG_ASSERT(finish_times.size() >= 1);
                 const auto t = std::min<Time>(finish_times.size() - 1, nt.t);
                 val += finish_times[t];
             }
@@ -333,7 +340,7 @@ void Projection::compute()
             {
                 const auto a = it->second.first;
                 const auto& finish_times = *it->second.second;
-                debug_assert(finish_times.size() >= 1);
+                DEBUG_ASSERT(finish_times.size() >= 1);
                 const auto t = std::min<Time>(finish_times.size() - 1, nt.t);
 
                 auto& vals = *vals_ptr;
@@ -346,7 +353,7 @@ void Projection::compute()
                 {
                     const auto a = it->second.first;
                     const auto& finish_times = *it->second.second;
-                    debug_assert(finish_times.size() >= 1);
+                    DEBUG_ASSERT(finish_times.size() >= 1);
                     const auto t = std::min<Time>(finish_times.size() - 1, et.t);
 
                     auto& vals = *vals_ptr;
@@ -359,7 +366,7 @@ void Projection::compute()
 #ifdef DEBUG
     for (const auto& [nt, val] : summed_nodetimes_)
     {
-        Float check_val = 0.0;
+        Real64 check_val = 0.0;
         for (Agent a = 0; a < A; ++a)
             for (const auto& variable : master_.agent_variables(a))
             {
@@ -368,7 +375,7 @@ void Projection::compute()
                 const auto t = std::min<Time>(path.size() - 1, nt.t);
                 check_val += (path[t].n == nt.n) * var_val;
             }
-        debug_assert(is_eq(val, check_val));
+        DEBUG_ASSERT(is_eq(val, check_val));
     }
 #endif
 
@@ -377,10 +384,10 @@ void Projection::compute()
 #ifndef PROJECT_FRACTIONAL_ONLY
     for (const auto& [nt, vals] : list_fractional_nodetimes_)
     {
-        Float check_total = 0.0;
+        Real64 check_total = 0.0;
         for (Agent a = 0; a < A; ++a)
         {
-            Float check_val = 0.0;
+            Real64 check_val = 0.0;
             for (const auto& variable : master_.agent_variables(a))
             {
                 const auto& path = variable.path();
@@ -388,44 +395,47 @@ void Projection::compute()
                 const auto t = std::min<Time>(path.size() - 1, nt.t);
                 check_val += (path[t].n == nt.n) * var_val;
             }
-            debug_assert(is_eq(check_val, find_agent_nodetime(a, nt)));
-            debug_assert(is_eq(check_val, vals->agent[a]));
+            DEBUG_ASSERT(is_eq(check_val, find_agent_nodetime(a, nt)));
+            DEBUG_ASSERT(is_eq(check_val, vals->agent[a]));
             check_total += check_val;
         }
-        debug_assert(is_eq(check_total, vals->total));
+        DEBUG_ASSERT(is_eq(check_total, vals->total));
     }
     for (const auto& [et, vals] : list_fractional_edgetimes_)
     {
-        Float check_total = 0.0;
+        Real64 check_total = 0.0;
         for (Agent a = 0; a < A; ++a)
         {
-            Float check_val = 0.0;
+            Real64 check_val = 0.0;
             for (const auto& variable : master_.agent_variables(a))
             {
                 const auto& path = variable.path();
                 const auto var_val = master_.variable_primal_sol(variable);
                 const auto t = std::min<Time>(path.size() - 1, et.t);
-                check_val += ((t <  path.size() - 1 && path[t] == et.et.e) ||
-                              (t >= path.size() - 1 && path[t].n == et.n && et.d == Direction::WAIT)) * var_val;
+                check_val +=
+                    ((t < path.size() - 1 && path[t] == et.e()) ||
+                     (t >= path.size() - 1 && path[t].n == et.n && et.d == Direction::WAIT)) *
+                    var_val;
             }
-            debug_assert(is_eq(check_val, et.d != Direction::WAIT ?
-                                            find_agent_move_edgetime(a, et) : find_agent_wait_edgetime(a, et)));
-            debug_assert(is_eq(check_val, vals->agent[a]));
+            DEBUG_ASSERT(is_eq(check_val,
+                               et.d != Direction::WAIT ? find_agent_move_edgetime(a, et) :
+                                                         find_agent_wait_edgetime(a, et)));
+            DEBUG_ASSERT(is_eq(check_val, vals->agent[a]));
             check_total += check_val;
         }
-        debug_assert(is_eq(check_total, vals->total));
+        DEBUG_ASSERT(is_eq(check_total, vals->total));
     }
 #endif
 #endif
 }
 
-Float Projection::find_summed_nodetime(const NodeTime nt) const
+Real64 Projection::find_summed_nodetime(const NodeTime nt) const
 {
     ZoneScopedC(TRACY_COLOUR);
 
     // Calculate value for verification.
 #ifdef DEBUG
-    Float check_val = 0.0;
+    Real64 check_val = 0.0;
     for (Agent a = 0; a < instance_.num_agents(); ++a)
         for (const auto& variable : master_.agent_variables(a))
         {
@@ -439,71 +449,74 @@ Float Projection::find_summed_nodetime(const NodeTime nt) const
     // Find the value from several places.
     if (auto it = summed_nodetimes_.find(nt); it != summed_nodetimes_.end())
     {
-        debug_assert(is_eq(check_val, it->second));
+        DEBUG_ASSERT(is_eq(check_val, it->second));
         return it->second;
     }
     else if (const auto it = target_finishing_.find(nt.n); it != target_finishing_.end())
     {
         const auto& finish_times = *it->second.second;
-        debug_assert(finish_times.size() >= 1);
+        DEBUG_ASSERT(finish_times.size() >= 1);
         const auto t = std::min<Time>(finish_times.size() - 1, nt.t);
-        debug_assert(is_eq(check_val, finish_times[t]));
+        DEBUG_ASSERT(is_eq(check_val, finish_times[t]));
         return finish_times[t];
     }
     else
     {
-        debug_assert(is_eq(check_val, 0.0));
+        DEBUG_ASSERT(is_eq(check_val, 0.0));
         return 0.0;
     }
 }
 
-// Float Projection::find_summed_wait_edgetime(const EdgeTime et) const
+// Real64 Projection::find_summed_wait_edgetime(const EdgeTime et) const
 // {
 //     ZoneScopedC(TRACY_COLOUR);
 //
 //     // Calculate value for verification.
-//     debug_assert(et.d == Direction::WAIT);
+//     DEBUG_ASSERT(et.d == Direction::WAIT);
 // #ifdef DEBUG
-//     Float check_val = 0.0;
+//     Real64 check_val = 0.0;
 //     for (Agent a = 0; a < instance_.num_agents(); ++a)
 //         for (const auto& variable : master_.agent_variables(a))
 //         {
 //             const auto& path = variable.path();
 //             const auto var_val = master_.variable_primal_sol(variable);
 //             const auto t = std::min<Time>(path.size() - 1, et.t);
-//             check_val += ((t <  path.size() - 1 && path[t] == et.et.e) ||
-//                           (t >= path.size() - 1 && path[t].n == et.n && et.d == Direction::WAIT)) * var_val;
+//             check_val += ((t <  path.size() - 1 && path[t] == et.e()) ||
+//                           (t >= path.size() - 1 && path[t].n == et.n && et.d
+//                           == Direction::WAIT)) * var_val;
 //         }
 // #endif
 //
 //     // Find the value from several places.
-//     if (auto it = summed_undirected_edgetimes_.find(et); it != summed_undirected_edgetimes_.end())
+//     if (auto it = summed_undirected_edgetimes_.find(et); it !=
+//     summed_undirected_edgetimes_.end())
 //     {
-//         debug_assert(is_eq(check_val, it->second));
+//         DEBUG_ASSERT(is_eq(check_val, it->second));
 //         return it->second;
 //     }
-//     else if (const auto it = target_finishing_.find(et.n); it != target_finishing_.end())
+//     else if (const auto it = target_finishing_.find(et.n); it !=
+//     target_finishing_.end())
 //     {
 //         const auto& finish_times = it->second.second;
-//         debug_assert(finish_times.size() >= 1);
+//         DEBUG_ASSERT(finish_times.size() >= 1);
 //         const auto t = std::min<Time>(finish_times.size() - 1, et.t);
-//         debug_assert(is_eq(check_val, finish_times[t]));
+//         DEBUG_ASSERT(is_eq(check_val, finish_times[t]));
 //         return finish_times[t];
 //     }
 //     else
 //     {
-//         debug_assert(is_eq(check_val, 0.0));
+//         DEBUG_ASSERT(is_eq(check_val, 0.0));
 //         return 0.0;
 //     }
 // }
 
-Float Projection::find_agent_nodetime(const Agent a, const NodeTime nt) const
+Real64 Projection::find_agent_nodetime(const Agent a, const NodeTime nt) const
 {
     ZoneScopedC(TRACY_COLOUR);
 
     // Calculate value for verification.
 #ifdef DEBUG
-    Float check_val = 0.0;
+    Real64 check_val = 0.0;
     for (const auto& variable : master_.agent_variables(a))
     {
         const auto& path = variable.path();
@@ -516,89 +529,92 @@ Float Projection::find_agent_nodetime(const Agent a, const NodeTime nt) const
     // Find the value from several places.
     if (auto it = agent_nodetimes_[a].find(nt); it != agent_nodetimes_[a].end())
     {
-        debug_assert(is_eq(check_val, it->second));
+        DEBUG_ASSERT(is_eq(check_val, it->second));
         return it->second;
     }
-    else if (const auto it = agent_target_finishing_.find({a, nt.n}); it != agent_target_finishing_.end())
+    else if (const auto it = agent_target_finishing_.find({a, nt.n});
+             it != agent_target_finishing_.end())
     {
         const auto& finish_times = it->second;
-        debug_assert(finish_times.size() >= 1);
+        DEBUG_ASSERT(finish_times.size() >= 1);
         const auto t = std::min<Time>(finish_times.size() - 1, nt.t);
-        debug_assert(is_eq(check_val, finish_times[t]));
+        DEBUG_ASSERT(is_eq(check_val, finish_times[t]));
         return finish_times[t];
     }
     else
     {
-        debug_assert(is_eq(check_val, 0.0));
+        DEBUG_ASSERT(is_eq(check_val, 0.0));
         return 0.0;
     }
 }
 
-Float Projection::find_agent_move_edgetime(const Agent a, const EdgeTime et) const
+Real64 Projection::find_agent_move_edgetime(const Agent a, const EdgeTime et) const
 {
     ZoneScopedC(TRACY_COLOUR);
 
     // Calculate value for verification.
-    debug_assert(et.d != Direction::WAIT);
+    DEBUG_ASSERT(et.d != Direction::WAIT);
 #ifdef DEBUG
-    Float check_val = 0.0;
+    Real64 check_val = 0.0;
     for (const auto& variable : master_.agent_variables(a))
     {
         const auto& path = variable.path();
         const auto var_val = master_.variable_primal_sol(variable);
         const auto t = std::min<Time>(path.size() - 1, et.t);
-        check_val += (t < path.size() - 1 && path[t] == et.et.e) * var_val;
+        check_val += (t < path.size() - 1 && path[t] == et.e()) * var_val;
     }
 #endif
 
     // Find the value from several places.
     if (auto it = agent_edgetimes_[a].find(et); it != agent_edgetimes_[a].end())
     {
-        debug_assert(is_eq(check_val, it->second));
+        DEBUG_ASSERT(is_eq(check_val, it->second));
         return it->second;
     }
     else
     {
-        debug_assert(is_eq(check_val, 0.0));
+        DEBUG_ASSERT(is_eq(check_val, 0.0));
         return 0.0;
     }
 }
 
-Float Projection::find_agent_wait_edgetime(const Agent a, const EdgeTime et) const
+Real64 Projection::find_agent_wait_edgetime(const Agent a, const EdgeTime et) const
 {
     ZoneScopedC(TRACY_COLOUR);
 
     // Calculate value for verification.
-    debug_assert(et.d == Direction::WAIT);
+    DEBUG_ASSERT(et.d == Direction::WAIT);
 #ifdef DEBUG
-    Float check_val = 0.0;
+    Real64 check_val = 0.0;
     for (const auto& variable : master_.agent_variables(a))
     {
         const auto& path = variable.path();
         const auto var_val = master_.variable_primal_sol(variable);
         const auto t = std::min<Time>(path.size() - 1, et.t);
-        check_val += ((t <  path.size() - 1 && path[t] == et.et.e) ||
-                      (t >= path.size() - 1 && path[t].n == et.n && et.d == Direction::WAIT)) * var_val;
+        check_val += ((t < path.size() - 1 && path[t] == et.e()) ||
+                      (t >= path.size() - 1 && path[t].n == et.n && et.d == Direction::WAIT)) *
+                     var_val;
     }
 #endif
 
     // Find the value from several places.
     if (auto it = agent_edgetimes_[a].find(et); it != agent_edgetimes_[a].end())
     {
-        debug_assert(is_eq(check_val, it->second));
+        DEBUG_ASSERT(is_eq(check_val, it->second));
         return it->second;
     }
-    else if (const auto it = agent_target_finishing_.find({a, et.n}); it != agent_target_finishing_.end())
+    else if (const auto it = agent_target_finishing_.find({a, et.n});
+             it != agent_target_finishing_.end())
     {
         const auto& finish_times = it->second;
-        debug_assert(finish_times.size() >= 1);
+        DEBUG_ASSERT(finish_times.size() >= 1);
         const auto t = std::min<Time>(finish_times.size() - 1, et.t);
-        debug_assert(is_eq(check_val, finish_times[t]));
+        DEBUG_ASSERT(is_eq(check_val, finish_times[t]));
         return finish_times[t];
     }
     else
     {
-        debug_assert(is_eq(check_val, 0.0));
+        DEBUG_ASSERT(is_eq(check_val, 0.0));
         return 0.0;
     }
 }
@@ -611,7 +627,7 @@ const ProjectionValues& Projection::find_list_fractional_nodetime(const NodeTime
 #ifdef DEBUG
 #ifndef PROJECT_FRACTIONAL_ONLY
     const auto A = instance_.num_agents();
-    Vector<Float> check_vals(A);
+    Vector<Real64> check_vals(A);
     for (Agent a = 0; a < A; ++a)
         for (const auto& variable : master_.agent_variables(a))
         {
@@ -628,7 +644,10 @@ const ProjectionValues& Projection::find_list_fractional_nodetime(const NodeTime
     {
 #ifdef DEBUG
 #ifndef PROJECT_FRACTIONAL_ONLY
-        for (Agent a = 0; a < A; ++a) { debug_assert(is_eq(check_vals[a], (*it->second)[a])); }
+        for (Agent a = 0; a < A; ++a)
+        {
+            DEBUG_ASSERT(is_eq(check_vals[a], (*it->second)[a]));
+        }
 #endif
 #endif
         return *it->second;
@@ -639,7 +658,10 @@ const ProjectionValues& Projection::find_list_fractional_nodetime(const NodeTime
         const auto t = std::min<Time>(finish_vals.size() - 1, nt.t);
 #ifdef DEBUG
 #ifndef PROJECT_FRACTIONAL_ONLY
-        for (Agent a = 0; a < A; ++a) { debug_assert(is_eq(check_vals[a], (*finish_vals[t])[a])); }
+        for (Agent a = 0; a < A; ++a)
+        {
+            DEBUG_ASSERT(is_eq(check_vals[a], (*finish_vals[t])[a]));
+        }
 #endif
 #endif
         return *finish_vals[t];
@@ -648,7 +670,10 @@ const ProjectionValues& Projection::find_list_fractional_nodetime(const NodeTime
     {
 #ifdef DEBUG
 #ifndef PROJECT_FRACTIONAL_ONLY
-        for (Agent a = 0; a < A; ++a) { debug_assert(is_eq(check_vals[a], (*zeros_)[a])); }
+        for (Agent a = 0; a < A; ++a)
+        {
+            DEBUG_ASSERT(is_eq(check_vals[a], (*zeros_)[a]));
+        }
 #endif
 #endif
         return *zeros_;
@@ -660,18 +685,18 @@ const ProjectionValues& Projection::find_list_fractional_move_edgetime(const Edg
     ZoneScopedC(TRACY_COLOUR);
 
     // Calculate values for verification.
-    debug_assert(et.d != Direction::WAIT);
+    DEBUG_ASSERT(et.d != Direction::WAIT);
 #ifdef DEBUG
 #ifndef PROJECT_FRACTIONAL_ONLY
     const auto A = instance_.num_agents();
-    Vector<Float> check_vals(A);
+    Vector<Real64> check_vals(A);
     for (Agent a = 0; a < A; ++a)
         for (const auto& variable : master_.agent_variables(a))
         {
             const auto& path = variable.path();
             const auto var_val = master_.variable_primal_sol(variable);
             const auto t = std::min<Time>(path.size() - 1, et.t);
-            check_vals[a] += (t < path.size() - 1 && path[t] == et.et.e) * var_val;
+            check_vals[a] += (t < path.size() - 1 && path[t] == et.e()) * var_val;
         }
 #endif
 #endif
@@ -681,7 +706,10 @@ const ProjectionValues& Projection::find_list_fractional_move_edgetime(const Edg
     {
 #ifdef DEBUG
 #ifndef PROJECT_FRACTIONAL_ONLY
-        for (Agent a = 0; a < A; ++a) { debug_assert(is_eq(check_vals[a], (*it->second)[a])); }
+        for (Agent a = 0; a < A; ++a)
+        {
+            DEBUG_ASSERT(is_eq(check_vals[a], (*it->second)[a]));
+        }
 #endif
 #endif
         return *it->second;
@@ -690,7 +718,10 @@ const ProjectionValues& Projection::find_list_fractional_move_edgetime(const Edg
     {
 #ifdef DEBUG
 #ifndef PROJECT_FRACTIONAL_ONLY
-        for (Agent a = 0; a < A; ++a) { debug_assert(is_eq(check_vals[a], (*zeros_)[a])); }
+        for (Agent a = 0; a < A; ++a)
+        {
+            DEBUG_ASSERT(is_eq(check_vals[a], (*zeros_)[a]));
+        }
 #endif
 #endif
         return *zeros_;
@@ -702,19 +733,21 @@ const ProjectionValues& Projection::find_list_fractional_wait_edgetime(const Edg
     ZoneScopedC(TRACY_COLOUR);
 
     // Calculate values for verification.
-    debug_assert(et.d == Direction::WAIT);
+    DEBUG_ASSERT(et.d == Direction::WAIT);
 #ifdef DEBUG
 #ifndef PROJECT_FRACTIONAL_ONLY
     const auto A = instance_.num_agents();
-    Vector<Float> check_vals(A);
+    Vector<Real64> check_vals(A);
     for (Agent a = 0; a < A; ++a)
         for (const auto& variable : master_.agent_variables(a))
         {
             const auto& path = variable.path();
             const auto var_val = master_.variable_primal_sol(variable);
             const auto t = std::min<Time>(path.size() - 1, et.t);
-            check_vals[a] += ((t <  path.size() - 1 && path[t] == et.et.e) ||
-                              (t >= path.size() - 1 && path[t].n == et.n && et.d == Direction::WAIT)) * var_val;
+            check_vals[a] +=
+                ((t < path.size() - 1 && path[t] == et.e()) ||
+                 (t >= path.size() - 1 && path[t].n == et.n && et.d == Direction::WAIT)) *
+                var_val;
         }
 #endif
 #endif
@@ -724,7 +757,10 @@ const ProjectionValues& Projection::find_list_fractional_wait_edgetime(const Edg
     {
 #ifdef DEBUG
 #ifndef PROJECT_FRACTIONAL_ONLY
-        for (Agent a = 0; a < A; ++a) { debug_assert(is_eq(check_vals[a], (*it->second)[a])); }
+        for (Agent a = 0; a < A; ++a)
+        {
+            DEBUG_ASSERT(is_eq(check_vals[a], (*it->second)[a]));
+        }
 #endif
 #endif
         return *it->second;
@@ -735,7 +771,10 @@ const ProjectionValues& Projection::find_list_fractional_wait_edgetime(const Edg
         const auto t = std::min<Time>(finish_vals.size() - 1, et.t);
 #ifdef DEBUG
 #ifndef PROJECT_FRACTIONAL_ONLY
-        for (Agent a = 0; a < A; ++a) { debug_assert(is_eq(check_vals[a], (*finish_vals[t])[a])); }
+        for (Agent a = 0; a < A; ++a)
+        {
+            DEBUG_ASSERT(is_eq(check_vals[a], (*finish_vals[t])[a]));
+        }
 #endif
 #endif
         return *finish_vals[t];
@@ -744,7 +783,10 @@ const ProjectionValues& Projection::find_list_fractional_wait_edgetime(const Edg
     {
 #ifdef DEBUG
 #ifndef PROJECT_FRACTIONAL_ONLY
-        for (Agent a = 0; a < A; ++a) { debug_assert(is_eq(check_vals[a], (*zeros_)[a])); }
+        for (Agent a = 0; a < A; ++a)
+        {
+            DEBUG_ASSERT(is_eq(check_vals[a], (*zeros_)[a]));
+        }
 #endif
 #endif
         return *zeros_;

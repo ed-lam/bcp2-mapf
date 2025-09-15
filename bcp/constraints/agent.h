@@ -8,11 +8,15 @@ Author: Edward Lam <ed@ed-lam.com>
 #pragma once
 
 #include "constraints/separator.h"
-#include "master/constraint.h"
+#include "pricing/pricer.h"
+#include "types/basic_types.h"
+#include "types/path.h"
+
+class Constraint;
 
 class AgentSeparator : public Separator
 {
-    struct AgentConstraint : public Constraint
+    struct ConstraintData
     {
         Agent a;
     };
@@ -22,16 +26,19 @@ class AgentSeparator : public Separator
     using Separator::Separator;
 
     // Separator type
-    constexpr static auto name() { return "Agent"; }
+    constexpr static auto name()
+    {
+        return "Agent";
+    }
 
     // Separate
     void separate();
 
     // Add dual solution to pricing costs
-    void add_pricing_costs(const Constraint& constraint, const Float dual);
+    static void apply_in_pricer(const Constraint& constraint, const Real64 dual, Pricer& pricer);
 
     // Add coefficient to a column
-    Float get_coeff(const Constraint& constraint, const Agent a, const Path& path);
+    static Real64 get_coeff(const Constraint& constraint, const Agent a, const Path& path);
 
   private:
     void create_row(const Agent a);

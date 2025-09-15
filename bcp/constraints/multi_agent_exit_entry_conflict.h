@@ -14,7 +14,7 @@ Author: Edward Lam <ed@ed-lam.com>
 
 class MultiAgentExitEntryConflictSeparator : public Separator
 {
-    struct MultiAgentExitEntryConstraint : public Constraint
+    struct ConstraintData
     {
         Agent every_agent;
         Agent canonical;
@@ -25,8 +25,8 @@ class MultiAgentExitEntryConflictSeparator : public Separator
     };
     struct MultiAgentExitEntryConstraintCandidate
     {
-        Float lhs;
-        Size num_other;
+        Real64 lhs;
+        Size64 num_other;
         Agent canonical;
         Time t;
         Edge canonical_e;
@@ -37,7 +37,7 @@ class MultiAgentExitEntryConflictSeparator : public Separator
 
     // Helper data
     Vector<MultiAgentExitEntryConstraintCandidate> candidates_;
-    HashMap<AgentTime, UInt8> num_separated_;
+    HashMap<AgentTime, UInt16> num_separated_;
 
   public:
     // Constructors and destructor
@@ -45,19 +45,23 @@ class MultiAgentExitEntryConflictSeparator : public Separator
     MultiAgentExitEntryConflictSeparator(const Instance& instance, Problem& problem);
 
     // Separator type
-    constexpr static auto name() { return "Multi-agent exit-entry"; }
+    constexpr static auto name()
+    {
+        return "Multi-agent exit-entry";
+    }
 
     // Separate
     void separate();
 
     // Add dual solution to pricing costs
-    void add_pricing_costs(const Constraint& constraint, const Float dual);
+    static void apply_in_pricer(const Constraint& constraint, const Real64 dual, Pricer& pricer);
 
     // Add coefficient to a column
-    Float get_coeff(const Constraint& constraint, const Agent a, const Path& path);
+    static Real64 get_coeff(const Constraint& constraint, const Agent a, const Path& path);
 
   private:
-    static Float calculate_canonical_agent_coeff(const Edge e, const Time t, const Path& path);
-    static Float calculate_other_agent_coeff(const Size32 num_es, const Edge* es, const Time t, const Path& path);
+    static Real64 calculate_canonical_agent_coeff(const Edge e, const Time t, const Path& path);
+    static Real64 calculate_other_agent_coeff(const Size32 num_es, const Edge* es, const Time t,
+                                              const Path& path);
     void create_row(const MultiAgentExitEntryConstraintCandidate& candidate);
 };

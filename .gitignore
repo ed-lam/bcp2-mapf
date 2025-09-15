@@ -1,7 +1,8 @@
-.*/
-build/
-outputs/
-tracy/
-*.sh
+.cache/
+.vscode/
+.zed/
 **/.DS_Store
+build/
+CMakePresets.json
 compile_commands.json
+tracy/

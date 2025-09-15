@@ -8,115 +8,176 @@ Author: Edward Lam <ed@ed-lam.com>
 #pragma once
 
 #include "master/gurobi_lp.h"
-#include "problem/debug.h"
+#include "pricing/pricer.h"
 #include "types/basic_types.h"
+#include "types/debug.h"
+#include "types/path.h"
 #include "types/pointers.h"
-#include "types/string.h"
+#include <boost/container_hash/hash.hpp>
 
+class Constraint;
 class Separator;
 
-enum class ConstraintFamily : UInt32
-{
-    Agent,
-    Corridor,
-    EdgeTime,
-    ExitEntry,
-    MultiAgentExitEntry,
-    MultiAgentTwoEdge,
-    NodeTime,
-    PseudoCorridor,
-    RectangleClique,
-    RectangleKnapsack,
-    Target,
-    TwoEdge
-};
+using ApplyConstraintInPricerFunction = void (*)(const Constraint& constraint, const Real64 dual,
+                                                 Pricer& pricer);
+using GetCoeffFunction = Real64 (*)(const Constraint& constraint, const Agent a, const Path& path);
 
 class Constraint
 {
     friend class MasterProblem;
-    friend class ConstraintPool;
+    friend class ConstraintStorage;
 
   protected:
-    String name_;
-    Separator* separator_;
-    Float activity_;
-    Float rhs_;
+    Hash hash_;
+    Real64 activity_;
+    Real64 rhs_;
     RowIndex row_;
-    Size32 hash_size_;
-    Size32 num_agents_ : 24;
     Sign sign_ : 8;
-    ConstraintFamily family_;
-    char32_t data_[0];
-    // WARNING: data_[0] to data_[num_agents_] must contain the agents involved in this row. This flexible array can be
-    // empty if the constraint is universal (same edge costs/coefficients for every agent) or the array can contain -1
-    // if the constraint spans all agents but has different edge costs/coefficients for different agents.
-    // WARNING: data_[0] to data_[hash_size_] must contain a unique representation of the constraint for a hash table.
+    Agent num_agents_ : 24;
+    ApplyConstraintInPricerFunction apply_in_pricer_;
+    Size32 data_size_;
+    Size32 hash_size_;
+    GetCoeffFunction get_coeff_;
+    Byte data_[];
 
   private:
-    Constraint(const Size32 hash_size,
-               const ConstraintFamily family,
-               Separator* separator,
-               String&& name,
-               const Size32 num_agents,
-               const Sign sign,
-               const Float rhs) :
-        name_(std::move(name)),
-        separator_(separator),
+    Constraint(const Sign sign, const Real64 rhs, const Agent num_agents, const Size64 data_size,
+               const Size64 hash_size, ApplyConstraintInPricerFunction apply_in_pricer,
+               GetCoeffFunction get_coeff, const String& name) :
+        hash_(0),
         activity_(1.0),
         rhs_(rhs),
         row_(-1),
-        hash_size_(1 + hash_size / sizeof(char32_t)),
-        num_agents_(num_agents),
         sign_(sign),
-        family_(family)
+        num_agents_(num_agents),
+        apply_in_pricer_(apply_in_pricer),
+        data_size_(data_size),
+        hash_size_(sizeof(GetCoeffFunction) + hash_size),
+        get_coeff_(get_coeff)
     {
-        debug_assert(hash_size % sizeof(char32_t) == 0);
+        // Copy the name.
+        const auto name_size = name.size();
+        auto name_ptr = new (data_ + data_size_) char[name_size + 1];
+        const auto name_c_str = name.c_str();
+        std::copy(name_c_str, name_c_str + name_size + 1, name_ptr);
+        DEBUG_ASSERT(name_c_str[name_size] == 0);
     }
 
   public:
     // Constructors and destructor
     Constraint() = delete;
     ~Constraint() = default;
-    Constraint(const Constraint&) noexcept = default;
-    Constraint(Constraint&&) noexcept = default;
-    Constraint& operator=(const Constraint&) noexcept = default;
-    Constraint& operator=(Constraint&&) noexcept = default;
-    template<class T>
-    static auto construct(const Size32 object_size,
-                          const Size32 hash_size,
-                          const ConstraintFamily family,
-                          Separator* separator,
-                          String&& name,
-                          const Size32 num_agents,
-                          const Sign sign,
-                          const Float rhs)
+    Constraint(const Constraint&) noexcept = delete;
+    Constraint(Constraint&&) noexcept = delete;
+    Constraint& operator=(const Constraint&) noexcept = delete;
+    Constraint& operator=(Constraint&&) noexcept = delete;
+
+    static auto construct(const Sign sign, const Real64 rhs, const Agent num_agents,
+                          const Size64 data_size, const Size64 hash_size,
+                          ApplyConstraintInPricerFunction apply_in_pricer,
+                          GetCoeffFunction get_coeff, const String& name)
     {
-        auto ptr = UniquePtr<T, FreeDeleter>{static_cast<T*>(std::malloc(object_size))};
-        new (ptr.get()) Constraint(hash_size, family, separator, std::move(name), num_agents, sign, rhs);
-        return ptr;
+        // Calculate object size and round up to alignment.
+        auto object_size = sizeof(Constraint) + data_size + (name.size() + 1);
+        const auto alignment = alignof(Constraint);
+        object_size = (object_size + alignment - 1) & (~(alignment - 1));
+
+        // Allocate and construct.
+        auto ptr = new (::operator new(object_size)) Constraint(
+            sign, rhs, num_agents, data_size, hash_size, apply_in_pricer, get_coeff, name);
+        return UniquePtr<Constraint>(ptr);
     }
 
     // Getters
-    inline auto separator() const { return separator_; }
-    inline const auto& name() const { return name_; }
-    inline auto activity() const { return activity_; }
-    inline auto row() const { return row_; }
-    inline auto sign() const { return sign_; }
-    inline auto rhs() const { return rhs_; }
-    inline auto data() const { return data_; }
-    inline auto hash_data() const
+    inline auto hash() const
     {
-        static_assert(sizeof(ConstraintFamily) == sizeof(char32_t));
-        debug_assert(reinterpret_cast<std::uintptr_t>(data_) ==
-                     reinterpret_cast<std::uintptr_t>(&family_) + sizeof(ConstraintFamily));
-
-        return std::u32string_view(reinterpret_cast<const char32_t*>(&family_), hash_size_);
+        return hash_;
+    }
+    inline auto activity() const
+    {
+        return activity_;
+    }
+    inline Real64 rhs() const
+    {
+        return rhs_;
+    }
+    inline auto row() const
+    {
+        return row_;
+    }
+    inline auto sign() const
+    {
+        return sign_;
+    }
+    inline auto data() const
+    {
+        return data_;
+    }
+    inline auto data()
+    {
+        return data_;
+    }
+    // inline auto data_range() const
+    // {
+    //     return Span<const Byte>(data(), data_size_);
+    // }
+    inline auto hash_range() const
+    {
+        return Span<const Byte>(data(), hash_size_);
+    }
+    inline auto num_agents() const
+    {
+        return num_agents_;
     }
     inline auto agents() const
     {
-        const auto begin = reinterpret_cast<const Agent*>(data_);
-        const auto end = reinterpret_cast<const Agent*>(data_) + num_agents_;
-        return Span<const Agent>{begin, end};
+        return Span<const Agent>(reinterpret_cast<const Agent*>(data()), num_agents());
+    }
+    inline auto name() const
+    {
+        return reinterpret_cast<const char*>(data_ + data_size_);
+    }
+    inline auto apply_in_pricer(const Real64 dual, Pricer& pricer) const
+    {
+        return (*apply_in_pricer_)(*this, dual, pricer);
+    }
+    inline auto get_coeff(const Agent a, const Path& path) const
+    {
+        return (*get_coeff_)(*this, a, path);
+    }
+
+  protected:
+    // Hashing
+    void update_hash()
+    {
+        // Check that hash is not yet computed.
+        DEBUG_ASSERT(hash_ == 0);
+
+        // (1) Hash the number of bytes for a unique representation of the object to prevent ending
+        // zeros and smaller data to hash to the same value. Stop 0100 and 01 hashing to the same
+        // value.
+        hash_ = boost::hash<Size32>()(hash_size_);
+
+        // (2) Hash the pointer to the separator function as a proxy for the constraint family.
+        // (3) Hash the data.
+        auto ptr = reinterpret_cast<Byte*>(&get_coeff_);
+        auto n = hash_size_;
+        while (n >= sizeof(std::size_t))
+        {
+            DEBUG_ASSERT(reinterpret_cast<std::uintptr_t>(ptr) % alignof(std::size_t) == 0);
+            std::size_t data;
+            std::memcpy(&data, ptr, sizeof(std::size_t));
+            boost::hash_combine(hash_, data);
+            ptr += sizeof(std::size_t);
+            n -= sizeof(std::size_t);
+        }
+        if (n)
+        {
+            std::size_t data = 0;
+            std::memcpy(&data, ptr, n);
+            boost::hash_combine(hash_, data);
+        }
     }
 };
-static_assert(sizeof(Constraint) == sizeof(String) + 8*3 + 4*4);
+static_assert(sizeof(Constraint) == 8 * 3 + 4 * 2 + 8 * 1 + 4 * 2 + 8 * 1);
+static_assert(std::is_trivial_v<Constraint>);

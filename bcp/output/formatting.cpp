@@ -5,8 +5,8 @@ Noncommercial License 1.0.0. A copy of this license can found in LICENSE.md.
 Author: Edward Lam <ed@ed-lam.com>
 */
 
-#include "master/variable.h"
 #include "output/formatting.h"
+#include "master/variable.h"
 #include "problem/instance.h"
 #include "types/bitset.h"
 #include "types/float_compare.h"
@@ -36,10 +36,9 @@ String format_edgetime(const EdgeTime et, const Map& map)
 }
 
 // Make a string of the coordinates in a path
-String format_path(
-    const Span<const Edge>& path,    // Path
-    const Map& map,                  // Map
-    const String& separator          // Separator
+String format_path(const Span<const Edge>& path, // Path
+                   const Map& map,               // Map
+                   const String& separator       // Separator
 )
 {
     String str;
@@ -51,10 +50,9 @@ String format_path(
     }
     return str;
 }
-String format_path_with_time(
-    const Span<const Edge>& path,    // Path
-    const Map& map,                  // Map
-    const String& separator          // Separator
+String format_path_with_time(const Span<const Edge>& path, // Path
+                             const Map& map,               // Map
+                             const String& separator       // Separator
 )
 {
     String str;
@@ -68,9 +66,8 @@ String format_path_with_time(
 }
 
 // Make a string of the coordinates in a path in columns
-String format_path_spaced(
-    const Span<const Edge>& path,    // Path
-    const Map& map                   // Map
+String format_path_spaced(const Span<const Edge>& path, // Path
+                          const Map& map                // Map
 )
 {
     String str;
@@ -80,9 +77,8 @@ String format_path_spaced(
     }
     return str;
 }
-String format_path_with_time_spaced(
-    const Span<const Edge>& path,    // Path
-    const Map& map                   // Map
+String format_path_with_time_spaced(const Span<const Edge>& path, // Path
+                                    const Map& map                // Map
 )
 {
     String str;
@@ -94,12 +90,12 @@ String format_path_with_time_spaced(
 }
 
 // Make a string of 0 and 1 of a bitset
-String format_bitset(const void* const bitset, const Size size)
+String format_bitset(const void* const bitset, const Size64 size)
 {
     const auto max_length = (size + 7) & (-8);
     const auto num_bytes = max_length / 8;
     String str;
-    for (Size i = num_bytes - 1; i >= 0; --i)
+    for (Size64 i = num_bytes - 1; i >= 0; --i)
     {
         str += fmt::format("{:08b}", static_cast<const char*>(bitset)[i]);
     }
@@ -126,7 +122,7 @@ void print_solution(const Map& map, const Vector<Variable*>& paths)
     {
         fmt::print("{:>11d}", t);
     }
-    println("");
+    PRINTLN("");
 
     // Print paths.
     for (Agent a = 0; a < A; ++a)
@@ -148,6 +144,6 @@ void print_solution(const Map& map, const Vector<Variable*>& paths)
             // Print.
             fmt::print("{:>11}", fmt::format("({},{})", x, y));
         }
-        println("");
+        PRINTLN("");
     }
 }

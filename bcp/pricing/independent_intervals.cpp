@@ -7,9 +7,9 @@ Author: Edward Lam <ed@ed-lam.com>
 
 // #define PRINT_DEBUG
 
-#include "output/formatting.h"
 #include "pricing/independent_intervals.h"
-#include "problem/debug.h"
+#include "output/formatting.h"
+#include "types/debug.h"
 #include "types/float_compare.h"
 #include "types/tracy.h"
 
@@ -43,20 +43,23 @@ void IndependentIntervals::clear()
     interval_set_.clear();
 }
 
-void IndependentIntervals::add_penalty(const Node n,
-                                       const Direction d,
-                                       const Time earliest,
-                                       const Time latest,
-                                       const Cost cost)
+void IndependentIntervals::add_penalty(const Node n, const Direction d, const Time earliest,
+                                       const Time latest, const Cost cost)
 {
     ZoneScopedC(TRACY_COLOUR);
 
     // Print.
-    debugln("    Adding penalty at {} in the {} direction on interval [{},{}) of cost {} to agent {}",
-            format_node(n, map_), d, earliest, latest, cost, a_);
+    DEBUGLN(
+        "    Adding penalty at {} in the {} direction on interval [{},{}) of cost {} to agent {}",
+        format_node(n, map_),
+        d,
+        earliest,
+        latest,
+        cost,
+        a_);
 
     // Sum the penality.
-    debug_assert(is_ge(cost, 0.0));
+    DEBUG_ASSERT(is_ge(cost, 0.0));
     insert_interval(n, d, earliest, latest, cost);
 }
 
@@ -65,10 +68,14 @@ void IndependentIntervals::add_end_penalty(const Time earliest, const Time lates
     ZoneScopedC(TRACY_COLOUR);
 
     // Print.
-    debugln("    Adding end penalty on interval [{},{}) of cost {} to agent {}", earliest, latest, cost, a_);
+    DEBUGLN("    Adding end penalty on interval [{},{}) of cost {} to agent {}",
+            earliest,
+            latest,
+            cost,
+            a_);
 
     // Sum the penality.
-    debug_assert(is_gt(cost, 0.0));
+    DEBUG_ASSERT(is_gt(cost, 0.0));
     insert_interval(-1, static_cast<Direction>(4), earliest, latest, cost);
 }
 
@@ -81,7 +88,9 @@ void IndependentIntervals::finalise()
     Time last_end_interval = 0;
     {
         auto interval = end_intervals;
-        for (; interval->next; interval = interval->next) {}
+        for (; interval->next; interval = interval->next)
+        {
+        }
         last_end_interval = interval->start;
     }
     const auto size = last_end_interval + 1;
@@ -94,7 +103,7 @@ void IndependentIntervals::finalise()
         const auto t_bound = std::min(interval->end, size);
         for (Time t = interval->start; t < t_bound; ++t)
         {
-            finish_time_h_[t] = INF;
+            finish_time_h_[t] = COST_INF;
             auto it = interval;
             do
             {
@@ -102,32 +111,27 @@ void IndependentIntervals::finalise()
                 const auto arrival_cost = arrival_time - t;
                 const auto finish_cost = arrival_cost + it->cost;
                 finish_time_h_[t] = std::min(finish_time_h_[t], finish_cost);
-            }
-            while ((it = it->next));
+            } while ((it = it->next));
         }
-    }
-    while ((interval = interval->next));
+    } while ((interval = interval->next));
 }
 
-void IndependentIntervals::insert_interval(const Node n,
-                                           const Direction d,
-                                           const Time start,
-                                           const Time end,
-                                           const Cost cost)
+void IndependentIntervals::insert_interval(const Node n, const Direction d, const Time start,
+                                           const Time end, const Cost cost)
 {
     ZoneScopedC(TRACY_COLOUR);
 
     // Check.
-    debug_assert(n == -1 || map_[n]);
-    debug_assert(0 <= start && start < end);
-    debug_assert(end <= TIME_MAX);
+    DEBUG_ASSERT(n == -1 || map_[n]);
+    DEBUG_ASSERT(0 <= start && start < end);
+    DEBUG_ASSERT(end <= TIME_MAX);
 
     // Output whether new intervals are created or the penalty is summed on existing intervals.
     Bool created_interval = false;
 
     // Get the list of intervals at node n going in direction d.
-    debug_assert(n >= 0 || d == 4);
-    debug_assert(n * 5 + d >= -1);
+    DEBUG_ASSERT(n >= 0 || d == 4);
+    DEBUG_ASSERT(n * 5 + d >= -1);
     auto& intervals = interval_set_[Edge{n, d}];
 
     // Create the default interval if empty.
@@ -135,7 +139,7 @@ void IndependentIntervals::insert_interval(const Node n,
     {
         ZoneScopedNC("Create default interval", TRACY_COLOUR);
 
-        intervals = static_cast<Interval*>(interval_storage_.get_buffer<true, false>());
+        intervals = new (interval_storage_.get_buffer<true, false>()) Interval;
         intervals->start = 0;
         intervals->end = TIME_MAX;
         intervals->cost = 0.0;
@@ -159,13 +163,13 @@ void IndependentIntervals::insert_interval(const Node n,
         }
         if (!current || current->start > start)
         {
-            auto inserted = static_cast<Interval*>(interval_storage_.get_buffer<true, false>());
+            auto inserted = new (interval_storage_.get_buffer<true, false>()) Interval;
             inserted->start = start;
             inserted->end = current ? current->start : TIME_MAX;
             inserted->cost = prev->cost;
             inserted->next = current;
 
-            debug_assert(prev);
+            DEBUG_ASSERT(prev);
             prev->end = start;
             prev->next = inserted;
 
@@ -178,7 +182,7 @@ void IndependentIntervals::insert_interval(const Node n,
     {
         ZoneScopedNC("Accumulate cost", TRACY_COLOUR);
 
-        debug_assert(current->start == start);
+        DEBUG_ASSERT(current->start == start);
         for (; current && current->end <= end; current = current->next)
         {
             current->cost += cost;
@@ -192,12 +196,12 @@ void IndependentIntervals::insert_interval(const Node n,
 
         if (!current)
         {
-            debug_assert(prev->end == TIME_MAX);
-            debug_assert(!prev->next);
+            DEBUG_ASSERT(prev->end == TIME_MAX);
+            DEBUG_ASSERT(!prev->next);
         }
         if (current && current->start < end)
         {
-            auto inserted = static_cast<Interval*>(interval_storage_.get_buffer<true, false>());
+            auto inserted = new (interval_storage_.get_buffer<true, false>()) Interval;
             inserted->start = end;
             inserted->end = current->end;
             inserted->cost = current->cost;
@@ -240,21 +244,19 @@ void IndependentIntervals::insert_interval(const Node n,
     }
 }
 
-void IndependentIntervals::insert_consecutive_intervals(const Node n,
-                                                        const Direction d,
-                                                        const Time start,
-                                                        const Time end)
+void IndependentIntervals::insert_consecutive_intervals(const Node n, const Direction d,
+                                                        const Time start, const Time end)
 {
     ZoneScopedC(TRACY_COLOUR);
 
     // Check.
-    debug_assert(n == -1 || map_[n]);
-    debug_assert(0 <= start && start < end);
-    debug_assert(end < TIME_MAX);
+    DEBUG_ASSERT(n == -1 || map_[n]);
+    DEBUG_ASSERT(0 <= start && start < end);
+    DEBUG_ASSERT(end < TIME_MAX);
 
     // Get the list of intervals at node n going in direction d.
-    debug_assert(n >= 0 || d == 4);
-    debug_assert(n * 5 + d >= -1);
+    DEBUG_ASSERT(n >= 0 || d == 4);
+    DEBUG_ASSERT(n * 5 + d >= -1);
     auto& intervals = interval_set_[Edge{n, d}];
 
     // Create the default interval if empty.
@@ -262,7 +264,7 @@ void IndependentIntervals::insert_consecutive_intervals(const Node n,
     {
         ZoneScopedNC("Create default interval", TRACY_COLOUR);
 
-        intervals = static_cast<Interval*>(interval_storage_.get_buffer<true, false>());
+        intervals = new (interval_storage_.get_buffer<true, false>()) Interval;
         intervals->start = 0;
         intervals->end = TIME_MAX;
         intervals->cost = 0.0;
@@ -286,13 +288,13 @@ void IndependentIntervals::insert_consecutive_intervals(const Node n,
         }
         if (!current || current->start > start)
         {
-            auto inserted = static_cast<Interval*>(interval_storage_.get_buffer<true, false>());
+            auto inserted = new (interval_storage_.get_buffer<true, false>()) Interval;
             inserted->start = start;
             inserted->end = current ? current->start : TIME_MAX;
             inserted->cost = prev->cost;
             inserted->next = current;
 
-            debug_assert(prev);
+            DEBUG_ASSERT(prev);
             prev->end = start;
             prev->next = inserted;
 
@@ -306,11 +308,11 @@ void IndependentIntervals::insert_consecutive_intervals(const Node n,
 
         for (Time t = start; t < end; ++t)
         {
-            debug_assert(current);
-            debug_assert(current->start == t);
+            DEBUG_ASSERT(current);
+            DEBUG_ASSERT(current->start == t);
             if (current->end > t + 1)
             {
-                auto inserted = static_cast<Interval*>(interval_storage_.get_buffer<true, false>());
+                auto inserted = new (interval_storage_.get_buffer<true, false>()) Interval;
                 inserted->start = t + 1;
                 inserted->end = current->end;
                 inserted->cost = current->cost;
@@ -319,7 +321,7 @@ void IndependentIntervals::insert_consecutive_intervals(const Node n,
                 current->end = t + 1;
                 current->next = inserted;
             }
-            debug_assert(current->end == t + 1);
+            DEBUG_ASSERT(current->end == t + 1);
 
             prev = current;
             current = current->next;
@@ -336,14 +338,14 @@ void IndependentIntervals::insert_consecutive_intervals(const Node n,
 void IndependentIntervals::check_invariants(const Node n, const Direction d)
 {
     const Interval* it = get_intervals(n, d);
-    debug_assert(it->start == 0);
+    DEBUG_ASSERT(it->start == 0);
     while (it && it->next)
     {
-        debug_assert(it->end == it->next->start);
+        DEBUG_ASSERT(it->end == it->next->start);
         it = it->next;
     }
-    debug_assert(it->end == TIME_MAX);
-    debug_assert(!it->next);
+    DEBUG_ASSERT(it->end == TIME_MAX);
+    DEBUG_ASSERT(!it->next);
 }
 #endif
 
@@ -352,31 +354,44 @@ void IndependentIntervals::print() const
     ZoneScopedC(TRACY_COLOUR);
 
     Node last_n = -2;
-    Size last_d = -1;
-    println("----------------------------------------------------------------------------------------------------------------");
-    println("{:>16s}{:>16s}{:>16s}{:>16s}{:>16s}{:>16s}{:>16s}",
-            "From N", "To N", "From XY", "To XY", "Start", "End", "Penalty");
+    Size64 last_d = -1;
+    PRINTLN("--------------------------------------------------------------------------------------"
+            "--------------------------");
+    PRINTLN("{:>16s}{:>16s}{:>16s}{:>16s}{:>16s}{:>16s}{:>16s}",
+            "From N",
+            "To N",
+            "From XY",
+            "To XY",
+            "Start",
+            "End",
+            "Penalty");
     for (Node n = -1; n < map_.size(); ++n)
-        for (Size d = (n < 0 ? 4 : 0); d <= Direction::WAIT; ++d)
+        for (Size64 d = (n < 0 ? 4 : 0); d <= Direction::WAIT; ++d)
             if (n == -1 || (map_[n] && map_[map_.get_destination(n, static_cast<Direction>(d))]))
             {
                 auto interval = get_intervals(n, static_cast<Direction>(d));
                 if (interval && (interval->next || interval->cost != 0.0))
                 {
-                    const auto dest = n >= 0 ? map_.get_destination(n, static_cast<Direction>(d)) : -1;
+                    const auto dest =
+                        n >= 0 ? map_.get_destination(n, static_cast<Direction>(d)) : -1;
                     if (n != last_n || d != last_d)
                     {
-                        println("----------------------------------------------------------------------------------------------------------------");
+                        PRINTLN("------------------------------------------------------------------"
+                                "----------------------------------------------");
                     }
                     do
                     {
-                        println("{:>16d}{:>16d}{:>16s}{:>16s}{:>16d}{:>16d}{:>16.4f}",
-                                n, dest,
-                                format_node(n, map_), format_node(dest, map_),
-                                interval->start, interval->end, interval->cost);
-                    }
-                    while ((interval = interval->next));
+                        PRINTLN("{:>16d}{:>16d}{:>16s}{:>16s}{:>16d}{:>16d}{:>16.4f}",
+                                n,
+                                dest,
+                                format_node(n, map_),
+                                format_node(dest, map_),
+                                interval->start,
+                                interval->end,
+                                interval->cost);
+                    } while ((interval = interval->next));
                 }
             }
-   println("----------------------------------------------------------------------------------------------------------------");
+    PRINTLN("--------------------------------------------------------------------------------------"
+            "--------------------------");
 }

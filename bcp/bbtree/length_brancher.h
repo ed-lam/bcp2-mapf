@@ -24,7 +24,10 @@ class LengthBrancher : public Brancher
     using Brancher::Brancher;
 
     // Bracner type
-    constexpr static auto name() { return "Length"; }
+    constexpr static auto name()
+    {
+        return "Length";
+    }
 
     // Branch
     Decisions branch();

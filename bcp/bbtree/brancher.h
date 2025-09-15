@@ -42,13 +42,18 @@ class Brancher
   protected:
     const Instance& instance_;
     Problem& problem_;
-    Size num_added_;
+    Size64 num_added_;
 
   public:
     // Constructors and destructor
     Brancher() = delete;
     Brancher(const Instance& instance, Problem& problem) :
-        clock_(), instance_(instance), problem_(problem), num_added_(0) {}
+        clock_(),
+        instance_(instance),
+        problem_(problem),
+        num_added_(0)
+    {
+    }
     virtual ~Brancher() = default;
     Brancher(const Brancher&) = default;
     Brancher(Brancher&&) = default;
@@ -56,8 +61,14 @@ class Brancher
     Brancher& operator=(Brancher&&) = delete;
 
     // Statistics
-    auto num_added() const { return num_added_; }
-    auto run_time() const { return clock_.total_duration(); }
+    auto num_added() const
+    {
+        return num_added_;
+    }
+    auto run_time() const
+    {
+        return clock_.total_duration();
+    }
 
     // Branch
     auto run()

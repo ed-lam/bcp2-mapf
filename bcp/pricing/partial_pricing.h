@@ -20,14 +20,14 @@ struct PricingTask
 {
     Agent a;
     Bool must_price;
-    Float* priority;
+    Real64* priority;
 };
 
 class PartialPricing
 {
     MasterProblem& master_;
     Vector<PricingTask> pricing_tasks_;
-    Vector<Float> pricing_priority_;
+    Vector<Real64> pricing_priority_;
 
   public:
     // Constructors and destructor

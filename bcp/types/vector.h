@@ -9,5 +9,5 @@ Author: Edward Lam <ed@ed-lam.com>
 
 #include <vector>
 
-template<class T>
+template <class T>
 using Vector = std::vector<T>;

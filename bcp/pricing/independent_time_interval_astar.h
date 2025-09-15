@@ -5,15 +5,17 @@ Noncommercial License 1.0.0. A copy of this license can found in LICENSE.md.
 Author: Edward Lam <ed@ed-lam.com>
 */
 
+#ifdef USE_INDEPENDENT_TIME_INTERVAL_ASTAR_PRICER
+
 #pragma once
 
 #include "pricing/independent_intervals.h"
 #include "pricing/once_off_penalties.h"
 #include "pricing/rectangle_penalties.h"
-#include "types/astar_priority_queue.h"
+#include "types/arena.h"
+#include "types/dary_heap.h"
 #include "types/hash_map.h"
 #include "types/map_types.h"
-#include "types/memory_pool.h"
 #ifdef CHECK_USING_ASTAR
 #include "pricing/independent_time_expanded_astar.h"
 #endif
@@ -22,7 +24,7 @@ class Problem;
 class DistanceHeuristic;
 struct Instance;
 
-template<Bool feasible>
+template <Bool feasible>
 class IndependentTimeIntervalAStar
 {
     static constexpr Cost default_edge_cost = feasible ? 1.0 : 0.0;
@@ -41,8 +43,8 @@ class IndependentTimeIntervalAStar
         PriorityQueueSizeType pq_index;
         Byte bitset[];
 
-        static const Size data_size = 8*5 + 2*2 + 4*1;
-        static const Size padding_size = 0;
+        static const Size64 data_size = 8 * 5 + 2 * 2 + 4 * 1;
+        static const Size64 padding_size = 0;
     };
     static_assert(sizeof(FeasibleLabel) == FeasibleLabel::data_size + FeasibleLabel::padding_size);
     struct InfeasibleLabel
@@ -57,10 +59,11 @@ class IndependentTimeIntervalAStar
         UInt16 reservations;
         Byte bitset[];
 
-        static const Size data_size = 8*4 + 4*1 + 2*3;
-        static const Size padding_size = 6;
+        static const Size64 data_size = 8 * 4 + 4 * 1 + 2 * 3;
+        static const Size64 padding_size = 6;
     };
-    static_assert(sizeof(InfeasibleLabel) == InfeasibleLabel::data_size + InfeasibleLabel::padding_size);
+    static_assert(sizeof(InfeasibleLabel) ==
+                  InfeasibleLabel::data_size + InfeasibleLabel::padding_size);
 
     // Priority queue data structures
     using Label = typename std::conditional<feasible, FeasibleLabel, InfeasibleLabel>::type;
@@ -98,7 +101,7 @@ class IndependentTimeIntervalAStar
                    std::tie(rhs->g, rhs->time_f, rhs->reservations, lhs->nt.t);
         }
     };
-    class PriorityQueue : public AStarPriorityQueue<Label*, LabelComparison, PriorityQueueSizeType>
+    class PriorityQueue : public DAryHeap<Label*, LabelComparison, PriorityQueueSizeType>
     {
       public:
         // Modify the handle in the label pointing to its position in the priority queue
@@ -128,7 +131,7 @@ class IndependentTimeIntervalAStar
     // Branching decisions
     Vector<NodeTime> waypoints_;
     Vector<Time> h_waypoint_to_target_;
-    Size next_waypoint_index_;
+    Size64 next_waypoint_index_;
     Time waypoint_time_;
     const Time* h_to_waypoint_;
 
@@ -137,18 +140,18 @@ class IndependentTimeIntervalAStar
     IndependentIntervals intervals_;
     OnceOffPenalties once_off_penalties_;
     RectanglePenalties rectangle_penalties_;
-    Size once_off_bitset_size_;
-    Size rectangle_bitset_size_;
+    Size64 once_off_bitset_size_;
+    Size64 rectangle_bitset_size_;
     Time earliest_target_time_;
     Time latest_target_time_;
 
     // Solver state
-    MemoryPool label_storage_;
+    Arena label_storage_;
     Label** closed_;
     PriorityQueue open_;
     Cost obj_;
 #ifdef USE_INDEPENDENT_TIME_INTERVAL_ASTAR_PRICER
-    Size& num_added_;
+    Size64& num_added_;
 #endif
 
     // Debug
@@ -159,11 +162,9 @@ class IndependentTimeIntervalAStar
   public:
     // Constructors and destructor
     IndependentTimeIntervalAStar() = delete;
-    IndependentTimeIntervalAStar(const Instance& instance,
-                                 Problem& problem,
-                                 DistanceHeuristic& distance_heuristic,
-                                 const Agent a,
-                                 Size& num_added);
+    IndependentTimeIntervalAStar(const Instance& instance, Problem& problem,
+                                 DistanceHeuristic& distance_heuristic, const Agent a,
+                                 Size64& num_added);
     ~IndependentTimeIntervalAStar();
     IndependentTimeIntervalAStar(const IndependentTimeIntervalAStar&) noexcept = delete;
     IndependentTimeIntervalAStar(IndependentTimeIntervalAStar&&) noexcept = default;
@@ -175,13 +176,10 @@ class IndependentTimeIntervalAStar
     void set_constant(const Cost constant);
     void add_nodetime_penalty(const NodeTime nt, const Cost cost);
     void add_edgetime_penalty(const EdgeTime et, const Cost cost);
-    template<OnceOffDirection d = OnceOffDirection::GEq>
+    template <OnceOffDirection d = OnceOffDirection::GEq>
     void add_once_off_penalty(const NodeTime nt, const Cost cost);
-    void add_rectangle_penalty(const EdgeTime first_entry,
-                               const EdgeTime first_exit,
-                               const Time length,
-                               const Node n_increment,
-                               const Cost cost);
+    void add_rectangle_penalty(const EdgeTime first_entry, const EdgeTime first_exit,
+                               const Time length, const Node n_increment, const Cost cost);
     void add_end_penalty(const Time earliest, const Time latest, const Cost cost);
 
     // Solve
@@ -197,8 +195,14 @@ class IndependentTimeIntervalAStar
     void reset();
 
     // Constants
-    constexpr static inline Node end_n() { return -1; }
-    constexpr static inline Bool is_end(const NodeTime nt) { return nt.n == end_n(); }
+    constexpr static inline Node end_n()
+    {
+        return -1;
+    }
+    constexpr static inline Bool is_end(const NodeTime nt)
+    {
+        return nt.n == end_n();
+    }
 
     // State generation
     Byte* get_once_off_bitset(Label* const label);
@@ -206,21 +210,23 @@ class IndependentTimeIntervalAStar
 #ifdef USE_RESERVATION_LOOKUP
     Bool calculate_reservation(const NodeTime nt);
 #endif
-    template<Bool towards_end>
+    template <Bool towards_end>
     void generate_start();
-    template<Bool towards_end>
+    template <Bool towards_end>
     void generate_nodetimes(const Node next_n, const Direction d, Label* current);
-    template<Bool towards_end>
+    template <Bool towards_end>
     void generate_waypoint(Label* current);
     void generate_end(Label* current);
-    template<Bool towards_end>
+    template <Bool towards_end>
     void expand(Label* current);
     void add_path(Label* end);
 
     // Queue functions
-    template<Bool is_wait_action>
+    template <Bool is_wait_action>
     Label* push(Label* next);
 
     // Debug
     // String format_label(const Label* const label) const;
 };
+
+#endif

@@ -13,17 +13,11 @@ Author: Edward Lam <ed@ed-lam.com>
 #include <boost/heap/d_ary_heap.hpp>
 #pragma GCC diagnostic pop
 
-template<class T, class Comparison = std::greater<T>>
-using ImmutablePriorityQueue = boost::heap::d_ary_heap<
-    T,
-    boost::heap::arity<4>,
-    boost::heap::compare<Comparison>,
-    boost::heap::mutable_<false>
->;
-template<class T, class Comparison = std::greater<T>>
-using MutablePriorityQueue = boost::heap::d_ary_heap<
-    T,
-    boost::heap::arity<4>,
-    boost::heap::compare<Comparison>,
-    boost::heap::mutable_<true>
->;
+template <class T, class Comparison = std::greater<T>>
+using ImmutablePriorityQueue =
+    boost::heap::d_ary_heap<T, boost::heap::arity<4>, boost::heap::compare<Comparison>,
+                            boost::heap::mutable_<false>>;
+template <class T, class Comparison = std::greater<T>>
+using MutablePriorityQueue =
+    boost::heap::d_ary_heap<T, boost::heap::arity<4>, boost::heap::compare<Comparison>,
+                            boost::heap::mutable_<true>>;

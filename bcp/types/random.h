@@ -11,5 +11,5 @@ Author: Edward Lam <ed@ed-lam.com>
 #include <random>
 
 using RandomNumberGenerator = std::mt19937;
-using UniformDistribution = std::uniform_real_distribution<Float>;
+using UniformDistribution = std::uniform_real_distribution<Real64>;
 using DiscreteDistribution = std::discrete_distribution<UInt32>;

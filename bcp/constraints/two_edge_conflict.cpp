@@ -31,7 +31,7 @@ void TwoEdgeConflictSeparator::separate()
     ZoneScopedC(TRACY_COLOUR);
 
     // Print.
-    debugln("Starting separator for two-edge conflicts");
+    DEBUGLN("Starting separator for two-edge conflicts");
 
     // Get the problem data.
     const auto A = instance_.num_agents();
@@ -42,20 +42,20 @@ void TwoEdgeConflictSeparator::separate()
 
     // Find cuts.
     candidates_.clear();
-    Array<Pair<EdgeTime, Float>, 4> a1_et2s;
+    Array<Pair<EdgeTime, Real64>, 4> a1_et2s;
     Array<Pair<EdgeTime, const ProjectionValues*>, 4> a2_et2s;
-    Size num_et2s;
+    Size64 num_et2s;
     for (Agent a1 = 0; a1 < A - 1; ++a1)
         for (const auto& [a1_et1, a1_et1_val] : projection.agent_move_edgetimes(a1))
             if (!is_integral(a1_et1_val))
             {
-                debug_assert(a1_et1.d != Direction::WAIT);
+                DEBUG_ASSERT(a1_et1.d != Direction::WAIT);
 
                 // Get the time.
                 const auto t = a1_et1.t;
 
                 // Get the first edge of agent 2.
-                const EdgeTime a2_et1{map.get_opposite_edge(a1_et1.et.e), t};
+                const EdgeTime a2_et1{map.get_opposite_edge(a1_et1.e()), t};
                 const auto& a2_et1_vals = projection.find_list_fractional_move_edgetime(a2_et1);
 
                 // Get the second edge of agent 1.
@@ -70,7 +70,8 @@ void TwoEdgeConflictSeparator::separate()
                         a1_et2s[num_et2s].second = projection.find_agent_move_edgetime(a1, et);
 
                         a2_et2s[num_et2s].first = EdgeTime{dest, Direction::SOUTH, t};
-                        a2_et2s[num_et2s].second = &projection.find_list_fractional_move_edgetime(a2_et2s[num_et2s].first);
+                        a2_et2s[num_et2s].second =
+                            &projection.find_list_fractional_move_edgetime(a2_et2s[num_et2s].first);
 
                         ++num_et2s;
                     }
@@ -84,7 +85,8 @@ void TwoEdgeConflictSeparator::separate()
                         a1_et2s[num_et2s].second = projection.find_agent_move_edgetime(a1, et);
 
                         a2_et2s[num_et2s].first = EdgeTime{dest, Direction::NORTH, t};
-                        a2_et2s[num_et2s].second = &projection.find_list_fractional_move_edgetime(a2_et2s[num_et2s].first);
+                        a2_et2s[num_et2s].second =
+                            &projection.find_list_fractional_move_edgetime(a2_et2s[num_et2s].first);
 
                         ++num_et2s;
                     }
@@ -98,7 +100,8 @@ void TwoEdgeConflictSeparator::separate()
                         a1_et2s[num_et2s].second = projection.find_agent_move_edgetime(a1, et);
 
                         a2_et2s[num_et2s].first = EdgeTime{dest, Direction::EAST, t};
-                        a2_et2s[num_et2s].second = &projection.find_list_fractional_move_edgetime(a2_et2s[num_et2s].first);
+                        a2_et2s[num_et2s].second =
+                            &projection.find_list_fractional_move_edgetime(a2_et2s[num_et2s].first);
 
                         ++num_et2s;
                     }
@@ -112,7 +115,8 @@ void TwoEdgeConflictSeparator::separate()
                         a1_et2s[num_et2s].second = projection.find_agent_move_edgetime(a1, et);
 
                         a2_et2s[num_et2s].first = EdgeTime{dest, Direction::WEST, t};
-                        a2_et2s[num_et2s].second = &projection.find_list_fractional_move_edgetime(a2_et2s[num_et2s].first);
+                        a2_et2s[num_et2s].second =
+                            &projection.find_list_fractional_move_edgetime(a2_et2s[num_et2s].first);
 
                         ++num_et2s;
                     }
@@ -123,7 +127,7 @@ void TwoEdgeConflictSeparator::separate()
                 const auto& a12_et3_vals = projection.find_list_fractional_wait_edgetime(a12_et3);
 
                 // Loop through the second edge of agent 1.
-                for (Size index = 0; index < num_et2s; ++index)
+                for (Size64 index = 0; index < num_et2s; ++index)
                 {
                     // Get the second edge of both agents.
                     const auto& [a1_et2, a1_et2_val] = a1_et2s[index];
@@ -131,10 +135,9 @@ void TwoEdgeConflictSeparator::separate()
                     const auto& a2_et2_vals = *a2_et2_vals_ptr;
 
                     // Stop processing if a cut cannot possibly be violated.
-                    const auto potential_lhs = a1_et1_val + a1_et2_val +
-                                               (a2_et1_vals.total - a2_et1_vals[a1]) +
-                                               (a2_et2_vals.total - a2_et2_vals[a1]) +
-                                               a12_et3_vals.total;
+                    const auto potential_lhs =
+                        a1_et1_val + a1_et2_val + (a2_et1_vals.total - a2_et1_vals[a1]) +
+                        (a2_et2_vals.total - a2_et2_vals[a1]) + a12_et3_vals.total;
                     if (is_le(potential_lhs, 1.0 + CUT_VIOLATION))
                     {
                         continue;
@@ -144,23 +147,27 @@ void TwoEdgeConflictSeparator::separate()
                     for (Agent a2 = a1 + 1; a2 < A; ++a2)
                     {
                         // Store a cut if violated.
-                        const auto lhs = a1_et1_val + a1_et2_val + a2_et1_vals[a2] + a2_et2_vals[a2] +
-                                         a12_et3_vals[a1] + a12_et3_vals[a2];
+                        const auto lhs = a1_et1_val + a1_et2_val + a2_et1_vals[a2] +
+                                         a2_et2_vals[a2] + a12_et3_vals[a1] + a12_et3_vals[a2];
                         if (is_gt(lhs, 1.0 + CUT_VIOLATION))
                         {
                             candidates_.push_back({lhs,
-                                                   a1, a2, t,
-                                                   {a1_et1.et.e, a1_et2.et.e, a12_et3.et.e},
-                                                   {a2_et1.et.e, a2_et2.et.e, a12_et3.et.e}});
+                                                   a1,
+                                                   a2,
+                                                   t,
+                                                   {a1_et1.e(), a1_et2.e(), a12_et3.e()},
+                                                   {a2_et1.e(), a2_et2.e(), a12_et3.e()}});
                         }
                     }
                 }
             }
 
     // Create the most violated cuts.
-    Size num_separated_this_run = 0;
+    Size64 num_separated_this_run = 0;
     num_separated_.set(0);
-    std::sort(candidates_.begin(), candidates_.end(), [](const auto& a, const auto& b) { return a.lhs > b.lhs; });
+    std::sort(candidates_.begin(),
+              candidates_.end(),
+              [](const auto& a, const auto& b) { return a.lhs > b.lhs; });
     for (const auto& candidate : candidates_)
     {
         const auto& [lhs, a1, a2, t, a1_es, a2_es] = candidate;
@@ -192,8 +199,8 @@ void TwoEdgeConflictSeparator::create_row(const TwoEdgeConstraintCandidate& cand
     const auto& [lhs, a1, a2, t, a1_es, a2_es] = candidate;
 
     // Print.
-    debugln("    Creating two-edge conflict cut on {}, {} and {} for agent {} and {}, {} and {} for agent {} "
-            "with LHS {}",
+    DEBUGLN("    Creating two-edge conflict cut on {}, {} and {} for agent {} and {}, {} and {} "
+            "for agent {} with LHS {}",
             format_edgetime(EdgeTime{a1_es[0], t}, instance_.map),
             format_edgetime(EdgeTime{a1_es[1], t}, instance_.map),
             format_edgetime(EdgeTime{a1_es[2], t}, instance_.map),
@@ -215,41 +222,30 @@ void TwoEdgeConflictSeparator::create_row(const TwoEdgeConstraintCandidate& cand
                             format_edge(a2_es[0], instance_.map),
                             format_edge(a2_es[1], instance_.map),
                             format_edge(a2_es[2], instance_.map));
-    constexpr auto object_size = sizeof(TwoEdgeConstraint);
-    constexpr auto hash_size = sizeof(Agent) * 2 + sizeof(Time) + sizeof(Edge) * 6;
-    auto constraint = Constraint::construct<TwoEdgeConstraint>(object_size,
-                                                               hash_size,
-                                                               ConstraintFamily::TwoEdge,
-                                                               this,
-                                                               std::move(name),
-                                                               2,
-                                                               '<',
-                                                               1.0);
-    debug_assert(reinterpret_cast<std::uintptr_t>(&constraint->a1) ==
-                 reinterpret_cast<std::uintptr_t>(constraint->data()));
-    constraint->a1 = a1;
-    constraint->a2 = a2;
-    constraint->t = t;
-    constraint->a1_es = a1_es;
-    constraint->a2_es = a2_es;
+    constexpr auto data_size = sizeof(ConstraintData);
+    constexpr auto hash_size = data_size;
+    auto constraint = Constraint::construct(
+        '<', 1.0, 2, data_size, hash_size, &apply_in_pricer, &get_coeff, name);
+    auto data = new (constraint->data()) ConstraintData;
+    data->a1 = a1;
+    data->a2 = a2;
+    data->t = t;
+    data->a1_es = a1_es;
+    data->a2_es = a2_es;
     master.add_row(std::move(constraint));
     ++num_added_;
 }
 
-void TwoEdgeConflictSeparator::add_pricing_costs(const Constraint& constraint, const Float dual)
+void TwoEdgeConflictSeparator::apply_in_pricer(const Constraint& constraint, const Real64 dual,
+                                               Pricer& pricer)
 {
     ZoneScopedC(TRACY_COLOUR);
 
     // Get the constraint data.
-    const auto& two_edge_constraint = *static_cast<const TwoEdgeConstraint*>(&constraint);
-    const auto a1 = two_edge_constraint.a1;
-    const auto a2 = two_edge_constraint.a2;
-    const auto t = two_edge_constraint.t;
-    const auto& a1_es = two_edge_constraint.a1_es;
-    const auto& a2_es = two_edge_constraint.a2_es;
+    const auto& [a1, a2, t, a1_es, a2_es] =
+        *reinterpret_cast<const ConstraintData*>(constraint.data());
 
     // Add the penalty on the edgetimes.
-    auto& pricer = problem_.pricer();
     for (const auto e : a1_es)
     {
         pricer.add_edgetime_penalty_one_agent(a1, EdgeTime{e, t}, -dual);
@@ -260,23 +256,22 @@ void TwoEdgeConflictSeparator::add_pricing_costs(const Constraint& constraint, c
     }
 }
 
-Float TwoEdgeConflictSeparator::get_coeff(const Constraint& constraint, const Agent a, const Path& path)
+Real64 TwoEdgeConflictSeparator::get_coeff(const Constraint& constraint, const Agent a,
+                                           const Path& path)
 {
     ZoneScopedC(TRACY_COLOUR);
 
     // Get the constraint data.
-    const auto& two_edge_constraint = *static_cast<const TwoEdgeConstraint*>(&constraint);
-    const auto a1 = two_edge_constraint.a1;
-    const auto a2 = two_edge_constraint.a2;
-    const auto t = two_edge_constraint.t;
-    const auto& a1_es = two_edge_constraint.a1_es;
-    const auto& a2_es = two_edge_constraint.a2_es;
+    const auto& [a1, a2, t, a1_es, a2_es] =
+        *reinterpret_cast<const ConstraintData*>(constraint.data());
 
     // Calculate coefficient.
-    return (a == a1 && calculate_coeff(a1_es, t, path)) || (a == a2 && calculate_coeff(a2_es, t, path));
+    return (a == a1 && calculate_coeff(a1_es, t, path)) ||
+           (a == a2 && calculate_coeff(a2_es, t, path));
 }
 
-Float TwoEdgeConflictSeparator::calculate_coeff(const Array<Edge, 3>& es, const Time t, const Path& path)
+Real64 TwoEdgeConflictSeparator::calculate_coeff(const Array<Edge, 3>& es, const Time t,
+                                                 const Path& path)
 {
     ZoneScopedC(TRACY_COLOUR);
 

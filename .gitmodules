@@ -1,9 +1,0 @@
-[submodule "fmt"]
-	path = fmt
-	url = https://github.com/fmtlib/fmt.git
-[submodule "cxxopts"]
-	path = cxxopts
-	url = https://github.com/jarro2783/cxxopts.git
-[submodule "range-v3"]
-	path = range-v3
-	url = https://github.com/ericniebler/range-v3.git

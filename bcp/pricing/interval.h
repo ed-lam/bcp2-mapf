@@ -23,5 +23,11 @@ struct Interval
     Interval(Interval&&) noexcept = default;
     Interval& operator=(const Interval&) noexcept = default;
     Interval& operator=(Interval&&) noexcept = default;
-    Interval(const Time start, const Time end, const Cost cost) : start(start), end(end), cost(cost), next(nullptr) {}
+    Interval(const Time start, const Time end, const Cost cost) :
+        start(start),
+        end(end),
+        cost(cost),
+        next(nullptr)
+    {
+    }
 };

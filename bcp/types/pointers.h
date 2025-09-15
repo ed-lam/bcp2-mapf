@@ -9,19 +9,11 @@ Author: Edward Lam <ed@ed-lam.com>
 
 #include <memory>
 
-template<class T, class Deleter = std::default_delete<T>>
+template <class T, class Deleter = std::default_delete<T>>
 using UniquePtr = std::unique_ptr<T, Deleter>;
 
-template<class T>
+template <class T>
 using SharedPtr = std::shared_ptr<T>;
 
-template<class T>
+template <class T>
 using WeakPtr = std::weak_ptr<T>;
-
-struct FreeDeleter
-{
-    inline void operator()(void *ptr)
-    {
-        std::free(ptr);
-    }
-};

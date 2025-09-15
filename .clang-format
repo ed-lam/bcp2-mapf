@@ -1,0 +1,12 @@
+BasedOnStyle: Microsoft
+BinPackArguments: false
+BreakBeforeBraces: Allman
+BreakBeforeTernaryOperators: false
+BreakConstructorInitializers: AfterColon
+BreakTemplateDeclarations: Yes
+ColumnLimit: 100
+IndentCaseLabels: true
+IndentWidth: 4
+Language: Cpp
+PackConstructorInitializers: Never
+PointerAlignment: Left

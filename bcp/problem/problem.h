@@ -26,10 +26,7 @@ Author: Edward Lam <ed@ed-lam.com>
 #include "heuristics/random_rounding.h"
 #include "heuristics/simple_rounding.h"
 #include "master/master.h"
-#include "pricing/independent_time_expanded_astar_pricer.h"
-#include "pricing/independent_time_interval_astar_pricer.h"
-#include "pricing/shared_time_expanded_astar_pricer.h"
-#include "pricing/shared_time_interval_astar_pricer.h"
+#include "pricing/pricer.h"
 #include "problem/projection.h"
 #include "problem/subroutine_set.h"
 #include "types/basic_types.h"
@@ -37,25 +34,15 @@ Author: Edward Lam <ed@ed-lam.com>
 #include <csignal>
 #include <exception>
 
-#ifdef USE_INDEPENDENT_TIME_EXPANDED_ASTAR_PRICER
-using Pricer = IndependentTimeExpandedAStarPricer;
-#endif
-#ifdef USE_INDEPENDENT_TIME_INTERVAL_ASTAR_PRICER
-using Pricer = IndependentTimeIntervalAStarPricer;
-#endif
-#ifdef USE_SHARED_TIME_EXPANDED_ASTAR_PRICER
-using Pricer = SharedTimeExpandedAStarPricer;
-#endif
-#ifdef USE_SHARED_TIME_INTERVAL_ASTAR_PRICER
-using Pricer = SharedTimeIntervalAStarPricer;
-#endif
-
 extern volatile std::sig_atomic_t raised_signal;
 
 class TerminationException : public std::exception
 {
   public:
-    const char* what() const noexcept override { return "Termianted"; }
+    const char* what() const noexcept override
+    {
+        return "Termianted";
+    }
 };
 
 class Problem
@@ -70,27 +57,23 @@ class Problem
     Vector<Cost> master_obj_history_;
     Pricer pricer_;
     SubroutineSet<AgentSeparator> initial_constraints_;
-    SubroutineSet<NodeTimeConflictSeparator,
-                  EdgeTimeConflictSeparator,
-                  CorridorConflictSeparator,
-                  ExitEntryConflictSeparator,
-                  PseudoCorridorConflictSeparator,
+    SubroutineSet<NodeTimeConflictSeparator, EdgeTimeConflictSeparator, CorridorConflictSeparator,
+                  ExitEntryConflictSeparator, PseudoCorridorConflictSeparator,
 #ifdef USE_RECTANGLE_CLIQUE_CUTS
                   RectangleCliqueConflictSeparator,
 #else
                   RectangleKnapsackConflictSeparator,
 #endif
-                  TargetConflictSeparator,
-                  TwoEdgeConflictSeparator
+                  TargetConflictSeparator, TwoEdgeConflictSeparator
                   // MultiAgentExitEntryConflictSeparator,
                   // MultiAgentTwoEdgeConflictSeparator
-                  > lazy_constraints_;
-    SubroutineSet<LengthBrancher,
-                  NodeTimeBrancher
+                  >
+        lazy_constraints_;
+    SubroutineSet<LengthBrancher, NodeTimeBrancher
                   // NegativeNodeTimeBrancher
-                  > branchers_;
-    SubroutineSet<SimpleRounding,
-                  RandomRounding> heuristics_;
+                  >
+        branchers_;
+    SubroutineSet<SimpleRounding, RandomRounding> heuristics_;
 
     // Solution
     Cost ub_;
@@ -98,8 +81,8 @@ class Problem
     Projection projection_;
 
     // Helper data
-    Size lp_num_feasible_;
-    Size lp_num_improving_;
+    Size64 lp_num_feasible_;
+    Size64 lp_num_improving_;
     Clock clock_;
     UInt64 num_log_lines_;
     UInt64 next_log_iter_;
@@ -115,24 +98,45 @@ class Problem
     Problem(const FilePath& scenario_path, const Agent agent_limit);
 
     // Getters
-    const auto& instance() const { return instance_; }
-    auto iter() const { return iter_; }
-    auto& bbtree() { return bbtree_; }
-    auto& master() { return master_; }
-    auto& pricer() { return pricer_; }
-    auto& projection() { return projection_; }
+    const auto& instance() const
+    {
+        return instance_;
+    }
+    auto iter() const
+    {
+        return iter_;
+    }
+    auto& bbtree()
+    {
+        return bbtree_;
+    }
+    auto& master()
+    {
+        return master_;
+    }
+    auto& pricer()
+    {
+        return pricer_;
+    }
+    auto& projection()
+    {
+        return projection_;
+    }
     Cost lb() const;
     Cost ub() const;
-    Float gap() const;
+    Real64 gap() const;
 
     // Solve
-    void solve(const Float time_limit = std::numeric_limits<Float>::infinity());
+    void solve(const Real64 time_limit = REAL_INF);
     inline void stop_if_timed_out() const
     {
         if (raised_signal || timed_out()) [[unlikely]]
             throw TerminationException();
     }
-    inline auto time_remaining() const { return clock_.time_remaining(); }
+    inline auto time_remaining() const
+    {
+        return clock_.time_remaining();
+    }
     // static inline void stop_if_terminated()
     // {
     //     if (raised_signal) [[unlikely]]
@@ -151,11 +155,14 @@ class Problem
     void store_master_obj_history(const Cost master_obj);
     Bool branch_early(const Cost master_obj);
     void update_ub(const Cost ub);
-    template<class T>
+    template <class T>
     Bool run_primal_heuristic(T& heuristic);
-    template<class T>
+    template <class T>
     Bool run_brancher(T& heuristic);
-    inline Bool timed_out() const { return clock_.timed_out(); }
+    inline Bool timed_out() const
+    {
+        return clock_.timed_out();
+    }
 
     // Get solution
     void update_projection();

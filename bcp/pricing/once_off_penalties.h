@@ -8,7 +8,7 @@ Author: Edward Lam <ed@ed-lam.com>
 #pragma once
 
 #include "output/formatting.h"
-#include "problem/debug.h"
+#include "types/debug.h"
 #include "types/hash_map.h"
 #include "types/map_types.h"
 #include "types/vector.h"
@@ -40,9 +40,18 @@ class OnceOffPenalties
     ~OnceOffPenalties() noexcept = default;
 
     // Getters
-    auto empty() const { return data_.empty(); }
-    Size size() const { return data_.size(); }
-    const auto& operator[](const Size index) const { return data_[index]; }
+    auto empty() const
+    {
+        return data_.empty();
+    }
+    Size64 size() const
+    {
+        return data_.size();
+    }
+    const auto& operator[](const Size64 index) const
+    {
+        return data_[index];
+    }
 
     // Clear
     inline void clear()
@@ -53,8 +62,8 @@ class OnceOffPenalties
     // Add a penalty for visiting a node (e.g., the target of another agent) at or later than nt.t
     void add(const Cost cost, const NodeTime nt, const OnceOffDirection d)
     {
-        debug_assert(nt.t >= 0);
-        debug_assert(cost >= 0);
+        DEBUG_ASSERT(nt.t >= 0);
+        DEBUG_ASSERT(cost >= 0);
         const Pair<OnceOffDirection, NodeTime> search_item{d, nt};
         auto it = std::lower_bound(
             data_.begin(),
@@ -62,9 +71,9 @@ class OnceOffPenalties
             search_item,
             [](const OnceOffPenalty& lhs, const Pair<OnceOffDirection, NodeTime>& rhs)
             {
-                return std::tie(lhs.d, lhs.nt.id) < std::tie(rhs.first, rhs.second.id);
-            }
-        );
+                return std::make_tuple(lhs.d, lhs.nt.id()) <
+                       std::make_tuple(rhs.first, rhs.second.id());
+            });
         if (it == data_.end() || it->nt != nt || it->d != d)
         {
             data_.insert(it, {cost, nt, d});
@@ -74,26 +83,29 @@ class OnceOffPenalties
             it->cost += cost;
         }
 #ifdef DEBUG
-        for (Size index = 0; index < data_.size() - 1; ++index)
-            debug_assert((data_[index].d <  data_[index + 1].d) ||
-                         (data_[index].d == data_[index + 1].d && data_[index].nt.id < data_[index + 1].nt.id));
+        for (Size64 index = 0; index < data_.size() - 1; ++index)
+        {
+            DEBUG_ASSERT((data_[index].d < data_[index + 1].d) ||
+                         (data_[index].d == data_[index + 1].d &&
+                          data_[index].nt.id() < data_[index + 1].nt.id()));
+        }
 #endif
     }
 
     // Print
     void print(const Map& map) const
     {
-        println("Once-off penalties:");
-        println("{:>12s}{:>8s}{:>12s}{:>18s}", "XY", "T", "Direction", "Cost");
-        for (Size index = 0; index < data_.size(); ++index)
+        PRINTLN("Once-off penalties:");
+        PRINTLN("{:>12s}{:>8s}{:>12s}{:>18s}", "XY", "T", "Direction", "Cost");
+        for (Size64 index = 0; index < data_.size(); ++index)
         {
             const auto& [cost, nt, d] = data_[index];
-            println("{:>12s}{:>8d}{:>12s}{:>18.2f}",
+            PRINTLN("{:>12s}{:>8d}{:>12s}{:>18.2f}",
                     format_node(nt.n, map),
                     nt.t,
                     d == OnceOffDirection::GEq ? ">=" : "<=",
                     cost);
         }
-        println("");
+        PRINTLN("");
     }
 };

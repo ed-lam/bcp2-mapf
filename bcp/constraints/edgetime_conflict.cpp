@@ -31,7 +31,7 @@ void EdgeTimeConflictSeparator::separate()
     ZoneScopedC(TRACY_COLOUR);
 
     // Print.
-    debugln("Starting separator for edgetime conflicts");
+    DEBUGLN("Starting separator for edgetime conflicts");
 
     // Get the problem data.
     const auto& map = instance_.map;
@@ -43,7 +43,7 @@ void EdgeTimeConflictSeparator::separate()
     candidates_.clear();
     for (const auto& [et1, val12] : projection.summed_undirected_edgetimes())
     {
-        debug_assert(et1.d == Direction::NORTH || et1.d == Direction::WEST);
+        DEBUG_ASSERT(et1.d == Direction::NORTH || et1.d == Direction::WEST);
         if (is_gt(val12, 1.0))
         {
             candidates_.push_back({val12, uniform_(rng_), et1});
@@ -51,30 +51,35 @@ void EdgeTimeConflictSeparator::separate()
     }
 
     // Create the most violated cuts.
-    std::sort(candidates_.begin(), candidates_.end(),
-              [](const auto& a, const auto& b) { return std::tie(a.lhs, a.random) > std::tie(b.lhs, b.random); });
-    for (Size index = 0; index < std::min<Size>(candidates_.size(), MAX_CUTS_PER_RUN); ++index)
+    std::sort(candidates_.begin(),
+              candidates_.end(),
+              [](const auto& a, const auto& b)
+              { return std::tie(a.lhs, a.random) > std::tie(b.lhs, b.random); });
+    for (Size64 index = 0; index < std::min<Size64>(candidates_.size(), MAX_CUTS_PER_RUN); ++index)
     {
         // Get the candidate.
         const auto& [lhs, random, et1] = candidates_[index];
 
         // Get the opposite edgetime.
-        const EdgeTime et2{map.get_opposite_edge(et1.et.e), et1.t};
+        const EdgeTime et2{map.get_opposite_edge(et1.e()), et1.t};
 
         // Choose a wait edgetime.
         auto et3 = (uniform_(rng_) <= 0.5 ? et1 : et2);
         et3.d = Direction::WAIT;
 
         // Print.
-        debugln("    Creating edgetime constraint at {} and {} with LHS {}",
-                format_edgetime(et1, map), format_edgetime(et3, map), lhs);
+        DEBUGLN("    Creating edgetime constraint at {} and {} with LHS {}",
+                format_edgetime(et1, map),
+                format_edgetime(et3, map),
+                lhs);
 
         // Create the row.
-        create_row(et1.t, et1.et.e, et2.et.e, et3.et.e);
+        create_row(et1.t, et1.e(), et2.e(), et3.e());
     }
 }
 
-void EdgeTimeConflictSeparator::create_row(const Time t, const Edge e1, const Edge e2, const Edge e3)
+void EdgeTimeConflictSeparator::create_row(const Time t, const Edge e1, const Edge e2,
+                                           const Edge e3)
 {
     ZoneScopedC(TRACY_COLOUR);
 
@@ -83,64 +88,58 @@ void EdgeTimeConflictSeparator::create_row(const Time t, const Edge e1, const Ed
     auto& master = problem_.master();
 
     // Create the row.
-    debug_assert(e3.d == Direction::WAIT);
-    auto name = fmt::format("edgetime{}", format_edgetime(e3.n == e1.n ? EdgeTime{e1, t} : EdgeTime{e2, t}, map));
-    constexpr auto object_size = sizeof(EdgeTimeConstraint);
-    constexpr auto hash_size = sizeof(Time) + sizeof(Edge) * 3;
-    auto constraint = Constraint::construct<EdgeTimeConstraint>(object_size,
-                                                                hash_size,
-                                                                ConstraintFamily::EdgeTime,
-                                                                this,
-                                                                std::move(name),
-                                                                0,
-                                                                '<',
-                                                                1.0);
-    debug_assert(reinterpret_cast<std::uintptr_t>(&constraint->t) ==
-                 reinterpret_cast<std::uintptr_t>(constraint->data()));
-    constraint->t = t;
-    constraint->e1 = e1;
-    constraint->e2 = e2;
-    constraint->e3 = e3;
+    DEBUG_ASSERT(e3.d == Direction::WAIT);
+    auto name = fmt::format("edgetime{}",
+                            format_edgetime(e3.n == e1.n ? EdgeTime{e1, t} : EdgeTime{e2, t}, map));
+    constexpr auto data_size = sizeof(ConstraintData);
+    constexpr auto hash_size = data_size;
+    auto constraint = Constraint::construct(
+        '<', 1.0, 0, data_size, hash_size, &apply_in_pricer, &get_coeff, name);
+    auto data = new (constraint->data()) ConstraintData;
+    data->t = t;
+    data->e1 = e1;
+    data->e2 = e2;
+    data->e3 = e3;
     master.add_row(std::move(constraint));
     ++num_added_;
 }
 
-void EdgeTimeConflictSeparator::add_pricing_costs(const Constraint& constraint, const Float dual)
+void EdgeTimeConflictSeparator::apply_in_pricer(const Constraint& constraint, const Real64 dual,
+                                                Pricer& pricer)
 {
     ZoneScopedC(TRACY_COLOUR);
 
     // Get the constraint data.
-    const auto& edgetime_constraint = *static_cast<const EdgeTimeConstraint*>(&constraint);
-    const auto t = edgetime_constraint.t;
-    const auto et1 = EdgeTime{edgetime_constraint.e1, t};
-    const auto et2 = EdgeTime{edgetime_constraint.e2, t};
-    const auto et3 = EdgeTime{edgetime_constraint.e3, t};
-    debug_assert(et3.d == Direction::WAIT);
+    const auto& [t, e1, e2, e3] = *reinterpret_cast<const ConstraintData*>(constraint.data());
+    DEBUG_ASSERT(e3.d == Direction::WAIT);
 
     // Add the dual solution to the reduced cost function.
-    auto& pricer = problem_.pricer();
+    const EdgeTime et1(e1, t);
+    const EdgeTime et2(e2, t);
+    const EdgeTime et3(e3, t);
     pricer.add_edgetime_penalty_all_agents(et1, -dual);
     pricer.add_edgetime_penalty_all_agents(et2, -dual);
     pricer.add_edgetime_penalty_all_agents(et3, -dual);
 }
 
-Float EdgeTimeConflictSeparator::get_coeff(const Constraint& constraint, const Agent, const Path& path)
+Real64 EdgeTimeConflictSeparator::get_coeff(const Constraint& constraint, const Agent,
+                                            const Path& path)
 {
     ZoneScopedC(TRACY_COLOUR);
 
     // Get the constraint data.
-    const auto& edgetime_constraint = *static_cast<const EdgeTimeConstraint*>(&constraint);
-    const auto t = edgetime_constraint.t;
-    const auto e1 = edgetime_constraint.e1;
-    const auto e2 = edgetime_constraint.e2;
-    const auto e3 = edgetime_constraint.e3;
-    debug_assert(e3.d == Direction::WAIT);
+    const auto& [t, e1, e2, e3] = *reinterpret_cast<const ConstraintData*>(constraint.data());
+    DEBUG_ASSERT(e3.d == Direction::WAIT);
 
     // Calculate coefficient.
+    const EdgeTime et1(e1, t);
+    const EdgeTime et2(e2, t);
+    const EdgeTime et3(e3, t);
     return calculate_coeff(t, e1, e2, e3, path);
 }
 
-Bool EdgeTimeConflictSeparator::calculate_coeff(const Time t, const Edge e1, const Edge e2, const Edge e3, const Path& path)
+Bool EdgeTimeConflictSeparator::calculate_coeff(const Time t, const Edge e1, const Edge e2,
+                                                const Edge e3, const Path& path)
 {
     ZoneScopedC(TRACY_COLOUR);
 

@@ -19,19 +19,18 @@ Author: Edward Lam <ed@ed-lam.com>
 #define CUT_VIOLATION (0.1)
 #define MAX_CUTS_PER_RUN (1000)
 
-template<class T>
+template <class T>
 inline T signum(const T val)
 {
     return (T{0} < val) - (val < T{0});
 }
 
-inline void append_edge(
-    const Map& map,            // Map
-    const Time t,              // Time of the edge
-    const Position x,          // Coordinate
-    const Position y,          // Coordinate
-    const Direction d,         // Direction
-    Vector<EdgeTime>& edges    // Output edges of the rectangle
+inline void append_edge(const Map& map,         // Map
+                        const Time t,           // Time of the edge
+                        const Position x,       // Coordinate
+                        const Position y,       // Coordinate
+                        const Direction d,      // Direction
+                        Vector<EdgeTime>& edges // Output edges of the rectangle
 )
 {
     ZoneScopedC(TRACY_COLOUR);
@@ -45,14 +44,14 @@ inline void append_edge(
 }
 
 inline Bool append_horizontal_boundary(
-    const Map& map,            // Map
-    const Time t0,             // Time at reference location
-    const Position x0,         // Coordinate of reference location
-    const Position y0,         // Coordinate of reference location
-    const Direction d,         // Direction
-    const Position x1,         // Start coordinate of the horizontal boundary
-    const Position x2,         // End coordinate of the horizontal boundary
-    Vector<EdgeTime>& edges    // Output edges of the rectangle
+    const Map& map,         // Map
+    const Time t0,          // Time at reference location
+    const Position x0,      // Coordinate of reference location
+    const Position y0,      // Coordinate of reference location
+    const Direction d,      // Direction
+    const Position x1,      // Start coordinate of the horizontal boundary
+    const Position x2,      // End coordinate of the horizontal boundary
+    Vector<EdgeTime>& edges // Output edges of the rectangle
 )
 {
     ZoneScopedC(TRACY_COLOUR);
@@ -76,15 +75,14 @@ inline Bool append_horizontal_boundary(
     return true;
 }
 
-inline Bool append_vertical_boundary(
-    const Map& map,            // Map
-    const Time t0,             // Time at reference location
-    const Position x0,         // Coordinate of reference location
-    const Position y0,         // Coordinate of reference location
-    const Direction d,         // Direction
-    const Position y1,         // Start coordinate of the vertical boundary
-    const Position y2,         // End coordinate of the vertical boundary
-    Vector<EdgeTime>& edges    // Output edges of the rectangle
+inline Bool append_vertical_boundary(const Map& map,    // Map
+                                     const Time t0,     // Time at reference location
+                                     const Position x0, // Coordinate of reference location
+                                     const Position y0, // Coordinate of reference location
+                                     const Direction d, // Direction
+                                     const Position y1, // Start coordinate of the vertical boundary
+                                     const Position y2, // End coordinate of the vertical boundary
+                                     Vector<EdgeTime>& edges // Output edges of the rectangle
 )
 {
     ZoneScopedC(TRACY_COLOUR);
@@ -108,33 +106,34 @@ inline Bool append_vertical_boundary(
     return true;
 }
 
-Bool find_rectangle_conflict(
-    const Map& map,                           // Map
-    const Projection& projection,             // Solution in the original space
-    const Agent a1,                           // Agent 1
-    const Agent a2,                           // Agent 2
-    const Time conflict_time,                 // Time of the conflict
-    const Path& a1_path,                      // Path of agent 1
-    const Path& a2_path,                      // Path of agent 1
-    const Time min_path_length,               // Length of the shorter path
-    Vector<EdgeTime>& rectangle,              // Edgetimes of the rectangle
-    Size32& num_a1_ets,                       // Number of edgetimes for agent 1
-    Size32& num_a2_ets,                       // Number of edgetimes for agent 2
-    NodeTime& a1_start,                       // Start nodetime of agent 1
-    NodeTime& a2_start,                       // Start nodetime of agent 2
-    NodeTime& a1_end,                         // End nodetime of agent 1
-    NodeTime& a2_end                          // End nodetime of agent 2
+Bool find_rectangle_conflict(const Map& map,               // Map
+                             const Projection& projection, // Solution in the original space
+                             const Agent a1,               // Agent 1
+                             const Agent a2,               // Agent 2
+                             const Time conflict_time,     // Time of the conflict
+                             const Path& a1_path,          // Path of agent 1
+                             const Path& a2_path,          // Path of agent 1
+                             const Time min_path_length,   // Length of the shorter path
+                             Vector<EdgeTime>& rectangle,  // Edgetimes of the rectangle
+                             Size32& num_a1_ets,           // Number of edgetimes for agent 1
+                             Size32& num_a2_ets,           // Number of edgetimes for agent 2
+                             NodeTime& a1_start,           // Start nodetime of agent 1
+                             NodeTime& a2_start,           // Start nodetime of agent 2
+                             NodeTime& a1_end,             // End nodetime of agent 1
+                             NodeTime& a2_end              // End nodetime of agent 2
 #if defined(DEBUG) or defined(PRINT_DEBUG)
-  , Float& output_lhs                         // LHS
+                             ,
+                             Real64& output_lhs // LHS
 #endif
 )
 {
     ZoneScopedC(TRACY_COLOUR);
 
     // Print.
-    debugln("    Checking conflict at {} for agents {} and {}",
+    DEBUGLN("    Checking conflict at {} for agents {} and {}",
             format_nodetime(NodeTime{a1_path[conflict_time].n, conflict_time}, map),
-            a1, a2);
+            a1,
+            a2);
 
     // Get the movement directions.
     Direction x_dir = Direction::INVALID;
@@ -181,22 +180,21 @@ Bool find_rectangle_conflict(
     // Find the first time when the direction changes.
     Time start_t = conflict_time;
     Time end_t = conflict_time;
-    for (;
-         (start_t >= 0) &&
-         (a1_path[start_t].d == x_dir || a1_path[start_t].d == y_dir) &&
-         (a2_path[start_t].d == x_dir || a2_path[start_t].d == y_dir);
-         --start_t);
+    for (; (start_t >= 0) && (a1_path[start_t].d == x_dir || a1_path[start_t].d == y_dir) &&
+           (a2_path[start_t].d == x_dir || a2_path[start_t].d == y_dir);
+         --start_t)
+        ;
     start_t++;
-    for (;
-         (end_t < min_path_length - 1) &&
-         (a1_path[end_t].d == x_dir || a1_path[end_t].d == y_dir) &&
-         (a2_path[end_t].d == x_dir || a2_path[end_t].d == y_dir);
-         ++end_t);
+    for (; (end_t < min_path_length - 1) &&
+           (a1_path[end_t].d == x_dir || a1_path[end_t].d == y_dir) &&
+           (a2_path[end_t].d == x_dir || a2_path[end_t].d == y_dir);
+         ++end_t)
+        ;
     if (end_t <= start_t + 2)
     {
         return false;
     }
-    debug_assert(0 <= start_t && end_t > start_t + 2 && end_t < min_path_length);
+    DEBUG_ASSERT(0 <= start_t && end_t > start_t + 2 && end_t < min_path_length);
 
     // Cannot find a rectangle conflict if the start location of the two agents are the same.
     if (a1_path[start_t].n == a2_path[start_t].n)
@@ -208,8 +206,8 @@ Bool find_rectangle_conflict(
 #ifdef DEBUG
     for (Time t = start_t; t < end_t; ++t)
     {
-        debug_assert(a1_path[t].d != Direction::WAIT);
-        debug_assert(a2_path[t].d != Direction::WAIT);
+        DEBUG_ASSERT(a1_path[t].d != Direction::WAIT);
+        DEBUG_ASSERT(a2_path[t].d != Direction::WAIT);
     }
 #endif
 
@@ -224,72 +222,66 @@ Bool find_rectangle_conflict(
     const auto [a2_end_x, a2_end_y] = map.get_xy(a2_end.n);
 
     // Check that there is no wait inside the rectangle.
-    debug_assert(std::abs(a1_end_x - a1_start_x) + std::abs(a1_end_y - a1_start_y) == end_t - start_t);
-    debug_assert(std::abs(a2_end_x - a2_start_x) + std::abs(a2_end_y - a2_start_y) == end_t - start_t);
+    DEBUG_ASSERT(std::abs(a1_end_x - a1_start_x) + std::abs(a1_end_y - a1_start_y) ==
+                 end_t - start_t);
+    DEBUG_ASSERT(std::abs(a2_end_x - a2_start_x) + std::abs(a2_end_y - a2_start_y) ==
+                 end_t - start_t);
 
     // Calculate the direction of the two agents.
     Direction a1_dir;
     Direction a2_dir;
-    if (a1_start_x <= a2_start_x && a1_start_y <= a2_start_y &&
-        a1_end_x   >= a2_end_x   && a1_end_y   >= a2_end_y   &&
-        a1_start_x <= a1_end_x   && a1_start_y >= a1_end_y   &&
-        a2_start_x <= a2_end_x   && a2_start_y >= a2_end_y)
+    if (a1_start_x <= a2_start_x && a1_start_y <= a2_start_y && a1_end_x >= a2_end_x &&
+        a1_end_y >= a2_end_y && a1_start_x <= a1_end_x && a1_start_y >= a1_end_y &&
+        a2_start_x <= a2_end_x && a2_start_y >= a2_end_y)
     {
         a1_dir = Direction::EAST;
         a2_dir = Direction::NORTH;
     }
-    else if (a2_start_x <= a1_start_x && a2_start_y <= a1_start_y &&
-             a2_end_x   >= a1_end_x   && a2_end_y   >= a1_end_y   &&
-             a2_start_x <= a2_end_x   && a2_start_y >= a2_end_y   &&
-             a1_start_x <= a1_end_x   && a1_start_y >= a1_end_y)
+    else if (a2_start_x <= a1_start_x && a2_start_y <= a1_start_y && a2_end_x >= a1_end_x &&
+             a2_end_y >= a1_end_y && a2_start_x <= a2_end_x && a2_start_y >= a2_end_y &&
+             a1_start_x <= a1_end_x && a1_start_y >= a1_end_y)
     {
         a1_dir = Direction::NORTH;
         a2_dir = Direction::EAST;
     }
-    else if (a1_start_x >= a2_start_x && a1_start_y <= a2_start_y &&
-             a1_end_x   <= a2_end_x   && a1_end_y   >= a2_end_y   &&
-             a1_start_x >= a1_end_x   && a1_start_y >= a1_end_y   &&
-             a2_start_x >= a2_end_x   && a2_start_y >= a2_end_y)
+    else if (a1_start_x >= a2_start_x && a1_start_y <= a2_start_y && a1_end_x <= a2_end_x &&
+             a1_end_y >= a2_end_y && a1_start_x >= a1_end_x && a1_start_y >= a1_end_y &&
+             a2_start_x >= a2_end_x && a2_start_y >= a2_end_y)
     {
         a1_dir = Direction::WEST;
         a2_dir = Direction::NORTH;
     }
-    else if (a2_start_x >= a1_start_x && a2_start_y <= a1_start_y &&
-             a2_end_x   <= a1_end_x   && a2_end_y   >= a1_end_y   &&
-             a2_start_x >= a2_end_x   && a2_start_y >= a2_end_y   &&
-             a1_start_x >= a1_end_x   && a1_start_y >= a1_end_y)
+    else if (a2_start_x >= a1_start_x && a2_start_y <= a1_start_y && a2_end_x <= a1_end_x &&
+             a2_end_y >= a1_end_y && a2_start_x >= a2_end_x && a2_start_y >= a2_end_y &&
+             a1_start_x >= a1_end_x && a1_start_y >= a1_end_y)
     {
         a1_dir = Direction::NORTH;
         a2_dir = Direction::WEST;
     }
-    else if (a1_start_x <= a2_start_x && a1_start_y >= a2_start_y &&
-             a1_end_x   >= a2_end_x   && a1_end_y   <= a2_end_y   &&
-             a1_start_x <= a1_end_x   && a1_start_y <= a1_end_y   &&
-             a2_start_x <= a2_end_x   && a2_start_y <= a2_end_y)
+    else if (a1_start_x <= a2_start_x && a1_start_y >= a2_start_y && a1_end_x >= a2_end_x &&
+             a1_end_y <= a2_end_y && a1_start_x <= a1_end_x && a1_start_y <= a1_end_y &&
+             a2_start_x <= a2_end_x && a2_start_y <= a2_end_y)
     {
         a1_dir = Direction::EAST;
         a2_dir = Direction::SOUTH;
     }
-    else if (a2_start_x <= a1_start_x && a2_start_y >= a1_start_y &&
-             a2_end_x   >= a1_end_x   && a2_end_y   <= a1_end_y &&
-             a2_start_x <= a2_end_x   && a2_start_y <= a2_end_y &&
-             a1_start_x <= a1_end_x   && a1_start_y <= a1_end_y)
+    else if (a2_start_x <= a1_start_x && a2_start_y >= a1_start_y && a2_end_x >= a1_end_x &&
+             a2_end_y <= a1_end_y && a2_start_x <= a2_end_x && a2_start_y <= a2_end_y &&
+             a1_start_x <= a1_end_x && a1_start_y <= a1_end_y)
     {
         a1_dir = Direction::SOUTH;
         a2_dir = Direction::EAST;
     }
-    else if (a1_start_x >= a2_start_x && a1_start_y >= a2_start_y &&
-             a1_end_x   <= a2_end_x   && a1_end_y   <= a2_end_y &&
-             a1_start_x >= a1_end_x   && a1_start_y <= a1_end_y &&
-             a2_start_x >= a2_end_x   && a2_start_y <= a2_end_y)
+    else if (a1_start_x >= a2_start_x && a1_start_y >= a2_start_y && a1_end_x <= a2_end_x &&
+             a1_end_y <= a2_end_y && a1_start_x >= a1_end_x && a1_start_y <= a1_end_y &&
+             a2_start_x >= a2_end_x && a2_start_y <= a2_end_y)
     {
         a1_dir = Direction::WEST;
         a2_dir = Direction::SOUTH;
     }
-    else if (a2_start_x >= a1_start_x && a2_start_y >= a1_start_y &&
-             a2_end_x   <= a1_end_x   && a2_end_y   <= a1_end_y   &&
-             a2_start_x >= a2_end_x   && a2_start_y <= a2_end_y   &&
-             a1_start_x >= a1_end_x   && a1_start_y <= a1_end_y)
+    else if (a2_start_x >= a1_start_x && a2_start_y >= a1_start_y && a2_end_x <= a1_end_x &&
+             a2_end_y <= a1_end_y && a2_start_x >= a2_end_x && a2_start_y <= a2_end_y &&
+             a1_start_x >= a1_end_x && a1_start_y <= a1_end_y)
     {
         a1_dir = Direction::SOUTH;
         a2_dir = Direction::WEST;
@@ -308,29 +300,33 @@ Bool find_rectangle_conflict(
     {
         const auto x_bound = a2_start_x + (a2_dir == Direction::EAST ? 1 : -1);
         const auto y_bound = a1_end_y + (a1_dir == Direction::NORTH ? 1 : -1);
-        if (!append_horizontal_boundary(map, start_t, a1_start_x, a1_start_y, a1_dir, x_bound, a2_end_x, rectangle))
+        if (!append_horizontal_boundary(
+                map, start_t, a1_start_x, a1_start_y, a1_dir, x_bound, a2_end_x, rectangle))
         {
             return false;
         }
 
-        if (!append_horizontal_boundary(map, exit_t, a1_end_x, y_bound, a1_dir, x_bound, a2_end_x, rectangle))
+        if (!append_horizontal_boundary(
+                map, exit_t, a1_end_x, y_bound, a1_dir, x_bound, a2_end_x, rectangle))
         {
             return false;
         }
     }
     else
     {
-        debug_assert(a1_dir == Direction::EAST || a1_dir == Direction::WEST);
+        DEBUG_ASSERT(a1_dir == Direction::EAST || a1_dir == Direction::WEST);
 
         const auto y_bound = a2_start_y + (a2_dir == Direction::NORTH ? -1 : 1);
         const auto x_bound = a1_end_x + (a1_dir == Direction::EAST ? -1 : 1);
 
-        if (!append_vertical_boundary(map, start_t, a1_start_x, a1_start_y, a1_dir, y_bound, a2_end_y, rectangle))
+        if (!append_vertical_boundary(
+                map, start_t, a1_start_x, a1_start_y, a1_dir, y_bound, a2_end_y, rectangle))
         {
             return false;
         }
 
-        if (!append_vertical_boundary(map, exit_t, x_bound, a1_end_y, a1_dir, y_bound, a2_end_y, rectangle))
+        if (!append_vertical_boundary(
+                map, exit_t, x_bound, a1_end_y, a1_dir, y_bound, a2_end_y, rectangle))
         {
             return false;
         }
@@ -343,29 +339,33 @@ Bool find_rectangle_conflict(
         const auto x_bound = a1_start_x + (a1_dir == Direction::EAST ? 1 : -1);
         const auto y_bound = a2_end_y + (a2_dir == Direction::NORTH ? 1 : -1);
 
-        if (!append_horizontal_boundary(map, start_t, a2_start_x, a2_start_y, a2_dir, x_bound, a1_end_x, rectangle))
+        if (!append_horizontal_boundary(
+                map, start_t, a2_start_x, a2_start_y, a2_dir, x_bound, a1_end_x, rectangle))
         {
             return false;
         }
 
-        if (!append_horizontal_boundary(map, exit_t, a2_end_x, y_bound, a2_dir, x_bound, a1_end_x, rectangle))
+        if (!append_horizontal_boundary(
+                map, exit_t, a2_end_x, y_bound, a2_dir, x_bound, a1_end_x, rectangle))
         {
             return false;
         }
     }
     else
     {
-        debug_assert(a2_dir == Direction::EAST || a2_dir == Direction::WEST);
+        DEBUG_ASSERT(a2_dir == Direction::EAST || a2_dir == Direction::WEST);
 
         const auto y_bound = a1_start_y + (a1_dir == Direction::NORTH ? -1 : 1);
         const auto x_bound = a2_end_x + (a2_dir == Direction::EAST ? -1 : 1);
 
-        if (!append_vertical_boundary(map, start_t, a2_start_x, a2_start_y, a2_dir, y_bound, a1_end_y, rectangle))
+        if (!append_vertical_boundary(
+                map, start_t, a2_start_x, a2_start_y, a2_dir, y_bound, a1_end_y, rectangle))
         {
             return false;
         }
 
-        if (!append_vertical_boundary(map, exit_t, x_bound, a2_end_y, a2_dir, y_bound, a1_end_y, rectangle))
+        if (!append_vertical_boundary(
+                map, exit_t, x_bound, a2_end_y, a2_dir, y_bound, a1_end_y, rectangle))
         {
             return false;
         }
@@ -373,23 +373,23 @@ Bool find_rectangle_conflict(
     num_a2_ets = rectangle.size() - num_a1_ets;
 
     // Determine if the cut is violated.
-    Float lhs = 0.0;
+    Real64 lhs = 0.0;
     for (Size32 idx = 0; idx < num_a1_ets; ++idx)
     {
         const auto& et = rectangle[idx];
         const auto val = projection.find_agent_move_edgetime(a1, et);
         lhs += val;
-        debugln("        Agent {}, edge {}, val {}", a1, format_edgetime(et, map), val);
+        DEBUGLN("        Agent {}, edge {}, val {}", a1, format_edgetime(et, map), val);
     }
     for (Size32 idx = num_a1_ets; idx < num_a1_ets + num_a2_ets; ++idx)
     {
         const auto& et = rectangle[idx];
         const auto val = projection.find_agent_move_edgetime(a2, et);
         lhs += val;
-        debugln("        Agent {}, edge {}, val {}", a2, format_edgetime(et, map), val);
+        DEBUGLN("        Agent {}, edge {}, val {}", a2, format_edgetime(et, map), val);
     }
-    debug_assert(is_le(lhs, 4.0));
-    debugln("        LHS: {:.4f}", lhs);
+    DEBUG_ASSERT(is_le(lhs, 4.0));
+    DEBUGLN("        LHS: {:.4f}", lhs);
 
     // Store outputs.
 #if defined(DEBUG) or defined(PRINT_DEBUG)
@@ -405,7 +405,7 @@ void RectangleKnapsackConflictSeparator::separate()
     ZoneScopedC(TRACY_COLOUR);
 
     // Print.
-    debugln("Starting separator for rectangle knapsack conflicts");
+    DEBUGLN("Starting separator for rectangle knapsack conflicts");
 
     // Get the problem data.
     const auto A = instance_.num_agents();
@@ -424,38 +424,52 @@ void RectangleKnapsackConflictSeparator::separate()
     NodeTime a1_end;
     NodeTime a2_end;
 #if defined(DEBUG) or defined(PRINT_DEBUG)
-    Float lhs;
+    Real64 lhs;
 #endif
-    Size num_separated_this_run = 0;
+    Size64 num_separated_this_run = 0;
     for (Agent a1 = 0; a1 < A - 1; ++a1)
         for (Agent a2 = a1 + 1; a2 < A; ++a2)
         {
             for (const auto& variable1 : master.agent_variables(a1))
                 if (const auto val1 = master.variable_primal_sol(variable1); is_gt(val1, 0.0))
                     for (const auto& variable2 : master.agent_variables(a2))
-                        if (const auto val2 = master.variable_primal_sol(variable2); is_gt(val2, 0.0))
+                        if (const auto val2 = master.variable_primal_sol(variable2);
+                            is_gt(val2, 0.0))
                         {
-                            // Find a vertex conflict and search outward to find a rectangle conflict.
+                            // Find a vertex conflict and search outward to find a rectangle
+                            // conflict.
                             const auto& path1 = variable1.path();
                             const auto& path2 = variable2.path();
                             const auto min_path_length = std::min(path1.size(), path2.size());
-                            for (Time conflict_time = 1; conflict_time < min_path_length - 1; ++conflict_time)
+                            for (Time conflict_time = 1; conflict_time < min_path_length - 1;
+                                 ++conflict_time)
                                 if (path1[conflict_time].n == path2[conflict_time].n &&
-                                    find_rectangle_conflict(map, projection,
-                                                            a1, a2,
+                                    find_rectangle_conflict(map,
+                                                            projection,
+                                                            a1,
+                                                            a2,
                                                             conflict_time,
-                                                            path1, path2, min_path_length,
-                                                            rectangle, num_a1_ets, num_a2_ets,
-                                                            a1_start, a2_start, a1_end, a2_end
+                                                            path1,
+                                                            path2,
+                                                            min_path_length,
+                                                            rectangle,
+                                                            num_a1_ets,
+                                                            num_a2_ets,
+                                                            a1_start,
+                                                            a2_start,
+                                                            a1_end,
+                                                            a2_end
 #if defined(DEBUG) or defined(PRINT_DEBUG)
-                                                          , lhs
+                                                            ,
+                                                            lhs
 #endif
                                                             ))
                                 {
                                     // Print.
-                                    debugln("        Creating rectangle knapsack cut for agents {} and {} from corners "
-                                            "{}, {}, {} and {} with LHS {}",
-                                            a1, a2,
+                                    DEBUGLN("        Creating rectangle knapsack cut for agents {} "
+                                            "and {} from corners {}, {}, {} and {} with LHS {}",
+                                            a1,
+                                            a2,
                                             format_nodetime(a1_start, map),
                                             format_nodetime(a2_start, map),
                                             format_nodetime(a1_end, map),
@@ -463,7 +477,14 @@ void RectangleKnapsackConflictSeparator::separate()
                                             lhs);
 
                                     // Create the row.
-                                    create_row(a1, a2, a1_start, a2_start, a1_end, a2_end, num_a1_ets, num_a2_ets,
+                                    create_row(a1,
+                                               a2,
+                                               a1_start,
+                                               a2_start,
+                                               a1_end,
+                                               a2_end,
+                                               num_a1_ets,
+                                               num_a2_ets,
                                                rectangle);
 
                                     // Exit if enough cuts are found.
@@ -477,17 +498,14 @@ void RectangleKnapsackConflictSeparator::separate()
                                     goto NEXT_AGENT_PAIR;
                                 }
                         }
-            NEXT_AGENT_PAIR:;
+        NEXT_AGENT_PAIR:;
         }
 }
 
-void RectangleKnapsackConflictSeparator::create_row(const Agent a1,
-                                                    const Agent a2,
+void RectangleKnapsackConflictSeparator::create_row(const Agent a1, const Agent a2,
                                                     const NodeTime a1_start,
-                                                    const NodeTime a2_start,
-                                                    const NodeTime a1_end,
-                                                    const NodeTime a2_end,
-                                                    const Size32 num_a1_ets,
+                                                    const NodeTime a2_start, const NodeTime a1_end,
+                                                    const NodeTime a2_end, const Size32 num_a1_ets,
                                                     const Size32 num_a2_ets,
                                                     const Vector<EdgeTime>& rectangle)
 {
@@ -499,78 +517,76 @@ void RectangleKnapsackConflictSeparator::create_row(const Agent a1,
 
     // Create the row.
     auto name = fmt::format("rectangle({},{},{},{},{},{})",
-                            a1, format_nodetime(a1_start, map), format_nodetime(a1_end, map),
-                            a2, format_nodetime(a2_start, map), format_nodetime(a2_end, map));
+                            a1,
+                            format_nodetime(a1_start, map),
+                            format_nodetime(a1_end, map),
+                            a2,
+                            format_nodetime(a2_start, map),
+                            format_nodetime(a2_end, map));
     const auto num_ets = num_a1_ets + num_a2_ets;
-    debug_assert(num_ets == rectangle.size());
-    const auto array_size = sizeof(EdgeTime) * num_ets;
-    const auto object_size = sizeof(RectangleKnapsackConstraint) + array_size;
-    const auto hash_size = sizeof(Agent) * 2 + sizeof(NodeTime) * 4;
-    auto constraint = Constraint::construct<RectangleKnapsackConstraint>(object_size,
-                                                                         hash_size,
-                                                                         ConstraintFamily::RectangleKnapsack,
-                                                                         this,
-                                                                         std::move(name),
-                                                                         2,
-                                                                         '<',
-                                                                         3.0);
-    debug_assert(reinterpret_cast<std::uintptr_t>(&constraint->a1) ==
-                 reinterpret_cast<std::uintptr_t>(constraint->data()));
-    constraint->a1 = a1;
-    constraint->a2 = a2;
-    constraint->a1_start = a1_start;
-    constraint->a2_start = a2_start;
-    constraint->a1_end = a1_end;
-    constraint->a2_end = a2_end;
-    constraint->num_a1_ets = num_a1_ets;
-    constraint->num_ets = num_ets;
-    std::copy(rectangle.begin(), rectangle.end(), constraint->ets);
+    DEBUG_ASSERT(num_ets == rectangle.size());
+    const auto data_size = sizeof(ConstraintData) + sizeof(EdgeTime) * num_ets;
+    const auto hash_size = data_size;
+    auto constraint = Constraint::construct(
+        '<', 3.0, 2, data_size, hash_size, &apply_in_pricer, &get_coeff, name);
+    auto data = new (constraint->data()) ConstraintData;
+    data->a1 = a1;
+    data->a2 = a2;
+    data->a1_start = a1_start;
+    data->a2_start = a2_start;
+    data->a1_end = a1_end;
+    data->a2_end = a2_end;
+    data->num_a1_ets = num_a1_ets;
+    data->num_ets = num_ets;
+    new (data->ets) EdgeTime[rectangle.size()];
+    std::copy(rectangle.begin(), rectangle.end(), data->ets);
     master.add_row(std::move(constraint));
     ++num_added_;
 }
 
-void RectangleKnapsackConflictSeparator::add_pricing_costs(const Constraint& constraint, const Float dual)
+void RectangleKnapsackConflictSeparator::apply_in_pricer(const Constraint& constraint,
+                                                         const Real64 dual, Pricer& pricer)
 {
     ZoneScopedC(TRACY_COLOUR);
 
     // Get the constraint data.
-    const auto& rectangle_constraint = *static_cast<const RectangleKnapsackConstraint*>(&constraint);
-    const auto a1 = rectangle_constraint.a1;
-    const auto a2 = rectangle_constraint.a2;
+    const auto& data = *reinterpret_cast<const ConstraintData*>(constraint.data());
+    const auto a1 = data.a1;
+    const auto a2 = data.a2;
 
     // Add the dual solution to the reduced cost function.
-    auto& pricer = problem_.pricer();
-    for (const auto& et : rectangle_constraint.a1_ets())
+    for (const auto& et : data.a1_ets())
     {
-        debug_assert(instance_.map[et.n]);
-        debug_assert(instance_.map[instance_.map.get_destination(et)]);
+        // DEBUG_ASSERT(instance_.map[et.n]);
+        // DEBUG_ASSERT(instance_.map[instance_.map.get_destination(et)]);
         pricer.add_edgetime_penalty_one_agent(a1, et, -dual);
     }
-    for (const auto& et : rectangle_constraint.a2_ets())
+    for (const auto& et : data.a2_ets())
     {
-        debug_assert(instance_.map[et.n]);
-        debug_assert(instance_.map[instance_.map.get_destination(et)]);
+        // DEBUG_ASSERT(instance_.map[et.n]);
+        // DEBUG_ASSERT(instance_.map[instance_.map.get_destination(et)]);
         pricer.add_edgetime_penalty_one_agent(a2, et, -dual);
     }
 }
 
-Float RectangleKnapsackConflictSeparator::get_coeff(const Constraint& constraint, const Agent a, const Path& path)
+Real64 RectangleKnapsackConflictSeparator::get_coeff(const Constraint& constraint, const Agent a,
+                                                     const Path& path)
 {
     ZoneScopedC(TRACY_COLOUR);
 
     // Get the constraint data.
-    const auto& rectangle_constraint = *static_cast<const RectangleKnapsackConstraint*>(&constraint);
-    const auto a1 = rectangle_constraint.a1;
-    const auto a2 = rectangle_constraint.a2;
+    const auto& data = *reinterpret_cast<const ConstraintData*>(constraint.data());
+    const auto a1 = data.a1;
+    const auto a2 = data.a2;
 
     // Calculate coefficient.
     if (a == a1)
     {
-        return calculate_coeff(rectangle_constraint.a1_ets(), path);
+        return calculate_coeff(data.a1_ets(), path);
     }
     else if (a == a2)
     {
-        return calculate_coeff(rectangle_constraint.a2_ets(), path);
+        return calculate_coeff(data.a2_ets(), path);
     }
     else
     {
@@ -578,15 +594,17 @@ Float RectangleKnapsackConflictSeparator::get_coeff(const Constraint& constraint
     }
 }
 
-Float RectangleKnapsackConflictSeparator::calculate_coeff(const Span<const EdgeTime>& ets, const Path& path)
+Real64 RectangleKnapsackConflictSeparator::calculate_coeff(const Span<const EdgeTime>& ets,
+                                                           const Path& path)
 {
     ZoneScopedC(TRACY_COLOUR);
 
-    Float coeff = 0.0;
+    Real64 coeff = 0.0;
     for (const auto& et : ets)
     {
         coeff += calculate_move_edgetime_coeff(et, path);
-        // println("{} {}", format_edgetime(et, problem_.instance().map), calculate_move_edgetime_coeff(et, path));
+        // PRINTLN("{} {}", format_edgetime(et, problem_.instance().map),
+        // calculate_move_edgetime_coeff(et, path));
     }
     return coeff;
 }

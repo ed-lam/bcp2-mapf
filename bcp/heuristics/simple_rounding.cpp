@@ -9,9 +9,9 @@ Author: Edward Lam <ed@ed-lam.com>
 
 #include "heuristics/simple_rounding.h"
 #include "master/master.h"
-#include "problem/debug.h"
 #include "problem/map.h"
 #include "problem/problem.h"
+#include "types/debug.h"
 #include "types/float_compare.h"
 #include "types/tracy.h"
 #include <limits>
@@ -53,10 +53,11 @@ Pair<Cost, Vector<Variable*>> SimpleRounding::execute()
                 candidates_.push_back(CandidatePath{uniform_(rng_), rounded_val, a, variable_ptr});
             }
         }
-    std::sort(candidates_.begin(), candidates_.end(), [](const CandidatePath& lhs, const CandidatePath& rhs)
-    {
-        return std::tie(lhs.rounded_val, lhs.random) > std::tie(rhs.rounded_val, rhs.random);
-    });
+    std::sort(
+        candidates_.begin(),
+        candidates_.end(),
+        [](const CandidatePath& lhs, const CandidatePath& rhs)
+        { return std::tie(lhs.rounded_val, lhs.random) > std::tie(rhs.rounded_val, rhs.random); });
 
     // Try to insert the paths in the order above into a feasible solution.
     Pair<Cost, Vector<Variable*>> output;
@@ -70,8 +71,8 @@ Pair<Cost, Vector<Variable*>> SimpleRounding::execute()
         target_blocked_[target] = TIME_MAX;
         target_crossed_[target] = -1;
     }
-    debug_assert(target_blocked_.size() == A);
-    debug_assert(target_crossed_.size() == A);
+    DEBUG_ASSERT(target_blocked_.size() == A);
+    DEBUG_ASSERT(target_crossed_.size() == A);
     for (const auto& [_, __, a, variable_ptr] : candidates_)
     {
         if (!sol[a])
@@ -90,7 +91,8 @@ Pair<Cost, Vector<Variable*>> SimpleRounding::execute()
                         goto NEXT_CANDIDATE_PATH;
                     }
 
-                    if (auto it = target_blocked_.find(nt.n); it != target_blocked_.end() && it->second <= nt.t)
+                    if (auto it = target_blocked_.find(nt.n);
+                        it != target_blocked_.end() && it->second <= nt.t)
                     {
                         goto NEXT_CANDIDATE_PATH;
                     }
@@ -130,28 +132,28 @@ Pair<Cost, Vector<Variable*>> SimpleRounding::execute()
                 {
                     nt.n = path[nt.t].n;
                     auto& target_blocked_time = target_blocked_.at(nt.n);
-                    debug_assert(target_blocked_time == TIME_MAX);
+                    DEBUG_ASSERT(target_blocked_time == TIME_MAX);
                     target_blocked_time = nt.t;
                 }
             }
 
             // Store the path.
-            debug_assert(!sol[a]);
+            DEBUG_ASSERT(!sol[a]);
             sol[a] = variable_ptr;
             sol_cost += path.size() - 1;
         }
-        NEXT_CANDIDATE_PATH:;
+    NEXT_CANDIDATE_PATH:;
     }
 
     // Check if a path is found for all agents.
     for (const auto& path_ptr : sol)
         if (!path_ptr)
         {
-            sol_cost = INF;
+            sol_cost = COST_INF;
             break;
         }
 
     // Return.
-    num_feasible_ += (sol_cost != INF);
+    num_feasible_ += (sol_cost != COST_INF);
     return output;
 }

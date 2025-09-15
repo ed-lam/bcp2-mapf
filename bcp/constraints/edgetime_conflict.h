@@ -14,7 +14,7 @@ Author: Edward Lam <ed@ed-lam.com>
 
 class EdgeTimeConflictSeparator : public Separator
 {
-    struct EdgeTimeConstraint : public Constraint
+    struct ConstraintData
     {
         Time t;
         Edge e1;
@@ -23,8 +23,8 @@ class EdgeTimeConflictSeparator : public Separator
     };
     struct EdgeTimeConstraintCandidate
     {
-        Float lhs;
-        Float random;
+        Real64 lhs;
+        Real64 random;
         EdgeTime et1;
     };
 
@@ -39,18 +39,22 @@ class EdgeTimeConflictSeparator : public Separator
     EdgeTimeConflictSeparator(const Instance& instance, Problem& problem);
 
     // Separator type
-    constexpr static auto name() { return "Edge-time"; }
+    constexpr static auto name()
+    {
+        return "Edge-time";
+    }
 
     // Separate
     void separate();
 
     // Add dual solution to pricing costs
-    void add_pricing_costs(const Constraint& constraint, const Float dual);
+    static void apply_in_pricer(const Constraint& constraint, const Real64 dual, Pricer& pricer);
 
     // Add coefficient to a column
-    Float get_coeff(const Constraint& constraint, const Agent a, const Path& path);
+    static Real64 get_coeff(const Constraint& constraint, const Agent a, const Path& path);
 
   private:
-    static Bool calculate_coeff(const Time t, const Edge e1, const Edge e2, const Edge e3, const Path& path);
+    static Bool calculate_coeff(const Time t, const Edge e1, const Edge e2, const Edge e3,
+                                const Path& path);
     void create_row(const Time t, const Edge e1, const Edge e2, const Edge e3);
 };

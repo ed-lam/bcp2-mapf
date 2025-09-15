@@ -15,7 +15,7 @@ Author: Edward Lam <ed@ed-lam.com>
 class RectangleKnapsackConflictSeparator : public Separator
 {
   public:
-    struct RectangleKnapsackConstraint : public Constraint
+    struct ConstraintData
     {
         Agent a1;
         Agent a2;
@@ -27,8 +27,14 @@ class RectangleKnapsackConflictSeparator : public Separator
         Size32 num_ets;
         EdgeTime ets[];
 
-        Span<const EdgeTime> a1_ets() const { return {&ets[0], &ets[num_a1_ets]}; }
-        Span<const EdgeTime> a2_ets() const { return {&ets[num_a1_ets], &ets[num_ets]}; }
+        Span<const EdgeTime> a1_ets() const
+        {
+            return {&ets[0], &ets[num_a1_ets]};
+        }
+        Span<const EdgeTime> a2_ets() const
+        {
+            return {&ets[num_a1_ets], &ets[num_ets]};
+        }
     };
 
   public:
@@ -36,26 +42,24 @@ class RectangleKnapsackConflictSeparator : public Separator
     using Separator::Separator;
 
     // Separator type
-    constexpr static auto name() { return "Rectangle knapsack"; }
+    constexpr static auto name()
+    {
+        return "Rectangle knapsack";
+    }
 
     // Separate
     void separate();
 
     // Add dual solution to pricing costs
-    void add_pricing_costs(const Constraint& constraint, const Float dual);
+    static void apply_in_pricer(const Constraint& constraint, const Real64 dual, Pricer& pricer);
 
     // Add coefficient to a column
-    Float get_coeff(const Constraint& constraint, const Agent a, const Path& path);
+    static Real64 get_coeff(const Constraint& constraint, const Agent a, const Path& path);
 
   private:
-    Float calculate_coeff(const Span<const EdgeTime>& ets, const Path& path);
-    void create_row(const Agent a1,
-                    const Agent a2,
-                    const NodeTime a1_start,
-                    const NodeTime a2_start,
-                    const NodeTime a1_end,
-                    const NodeTime a2_end,
-                    const Size32 num_a1_ets,
-                    const Size32 num_a2_ets,
+    static Real64 calculate_coeff(const Span<const EdgeTime>& ets, const Path& path);
+    void create_row(const Agent a1, const Agent a2, const NodeTime a1_start,
+                    const NodeTime a2_start, const NodeTime a1_end, const NodeTime a2_end,
+                    const Size32 num_a1_ets, const Size32 num_a2_ets,
                     const Vector<EdgeTime>& rectangle);
 };

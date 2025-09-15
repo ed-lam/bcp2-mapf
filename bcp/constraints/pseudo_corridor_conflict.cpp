@@ -19,7 +19,8 @@ Author: Edward Lam <ed@ed-lam.com>
 #define CUT_VIOLATION (0.1)
 #define MAX_CUTS_PER_RUN (1000)
 
-PseudoCorridorConflictSeparator::PseudoCorridorConflictSeparator(const Instance& instance, Problem& problem) :
+PseudoCorridorConflictSeparator::PseudoCorridorConflictSeparator(const Instance& instance,
+                                                                 Problem& problem) :
     Separator(instance, problem),
     candidates_(),
     num_separated_(instance.num_agents(), instance.num_agents())
@@ -31,7 +32,7 @@ void PseudoCorridorConflictSeparator::separate()
     ZoneScopedC(TRACY_COLOUR);
 
     // Print.
-    debugln("Starting separator for pseudo-corridor conflicts");
+    DEBUGLN("Starting separator for pseudo-corridor conflicts");
 
     // Get the problem data.
     const auto A = instance_.num_agents();
@@ -48,21 +49,21 @@ void PseudoCorridorConflictSeparator::separate()
             {
                 ZoneScopedNC("Get values", TRACY_COLOUR);
 
-                debug_assert(a1_et1.d != Direction::WAIT);
+                DEBUG_ASSERT(a1_et1.d != Direction::WAIT);
 
                 // Get the time.
                 const auto t = a1_et1.t;
 
                 // Get the second edge of agent 1.
-                const EdgeTime a1_et2{a1_et1.et.e, t + 1};
+                const EdgeTime a1_et2{a1_et1.e(), t + 1};
                 const auto a1_et2_val = projection.find_agent_move_edgetime(a1, a1_et2);
 
                 // Get the first edge of agent 2.
-                const EdgeTime a2_et1{map.get_opposite_edge(a1_et1.et.e), t};
+                const EdgeTime a2_et1{map.get_opposite_edge(a1_et1.e()), t};
                 const auto& a2_et1_vals = projection.find_list_fractional_move_edgetime(a2_et1);
 
                 // Get the second edge of agent 2.
-                const EdgeTime a2_et2{a2_et1.et.e, t + 1};
+                const EdgeTime a2_et2{a2_et1.e(), t + 1};
                 const auto& a2_et2_vals = projection.find_list_fractional_move_edgetime(a2_et2);
 
                 // Get the candidate third edge of agent 1.
@@ -93,25 +94,26 @@ void PseudoCorridorConflictSeparator::separate()
                         const auto a2_et2_val = a2_et2_vals[a2];
 
                         // Compute the LHS.
-                        const auto lhs = a1_et1_val + a1_et2_val + a1_et3_val + a1_et4_val + a2_et1_val + a2_et2_val;
+                        const auto lhs = a1_et1_val + a1_et2_val + a1_et3_val + a1_et4_val +
+                                         a2_et1_val + a2_et2_val;
 
                         // Store a cut if violated.
                         if (is_gt(lhs, 1.0 + CUT_VIOLATION))
                         {
                             ZoneScopedNC("Create candidate", TRACY_COLOUR);
 
-                            candidates_.push_back({lhs,
-                                                   a1, a2,
-                                                   {a1_et1, a1_et2, a1_et3, a1_et4},
-                                                   {a2_et1, a2_et2}});
+                            candidates_.push_back(
+                                {lhs, a1, a2, {a1_et1, a1_et2, a1_et3, a1_et4}, {a2_et1, a2_et2}});
                         }
                     }
             }
 
     // Create the most violated cuts.
-    Size num_separated_this_run = 0;
+    Size64 num_separated_this_run = 0;
     num_separated_.set(0);
-    std::sort(candidates_.begin(), candidates_.end(), [](const auto& a, const auto& b) { return a.lhs > b.lhs; });
+    std::sort(candidates_.begin(),
+              candidates_.end(),
+              [](const auto& a, const auto& b) { return a.lhs > b.lhs; });
     for (const auto& candidate : candidates_)
     {
         const auto& [lhs, a1, a2, a1_ets, a2_ets] = candidate;
@@ -144,8 +146,8 @@ void PseudoCorridorConflictSeparator::create_row(const PseudoCorridorConstraintC
     const auto& [lhs, a1, a2, a1_ets, a2_ets] = candidate;
 
     // Print.
-    debugln("    Creating pseudo-corridor conflict cut on {}, {}, {} and {} for agent {} and {} and {} for agent {} "
-            "with LHS {}",
+    DEBUGLN("    Creating pseudo-corridor conflict cut on {}, {}, {} and {} for agent {} and {} "
+            "and {} for agent {} with LHS {}",
             format_edgetime(a1_ets[0], map),
             format_edgetime(a1_ets[1], map),
             format_edgetime(a1_ets[2], map),
@@ -166,39 +168,29 @@ void PseudoCorridorConflictSeparator::create_row(const PseudoCorridorConstraintC
                             a2,
                             format_edgetime(a2_ets[0], map),
                             format_edgetime(a2_ets[1], map));
-    constexpr auto object_size = sizeof(PseudoCorridorConstraint);
-    constexpr auto hash_size = sizeof(Agent) * 2 + sizeof(EdgeTime) * 6;
-    auto constraint = Constraint::construct<PseudoCorridorConstraint>(object_size,
-                                                                      hash_size,
-                                                                      ConstraintFamily::PseudoCorridor,
-                                                                      this,
-                                                                      std::move(name),
-                                                                      2,
-                                                                      '<',
-                                                                      1.0);
-    debug_assert(reinterpret_cast<std::uintptr_t>(&constraint->a1) ==
-                 reinterpret_cast<std::uintptr_t>(constraint->data()));
-    constraint->a1 = a1;
-    constraint->a2 = a2;
-    constraint->a1_ets = a1_ets;
-    constraint->a2_ets = a2_ets;
+    constexpr auto data_size = sizeof(ConstraintData);
+    constexpr auto hash_size = data_size;
+    auto constraint = Constraint::construct(
+        '<', 1.0, 2, data_size, hash_size, &apply_in_pricer, &get_coeff, name);
+    auto data = new (constraint->data()) ConstraintData;
+    data->a1 = a1;
+    data->a2 = a2;
+    data->a1_ets = a1_ets;
+    data->a2_ets = a2_ets;
     master.add_row(std::move(constraint));
     ++num_added_;
 }
 
-void PseudoCorridorConflictSeparator::add_pricing_costs(const Constraint& constraint, const Float dual)
+void PseudoCorridorConflictSeparator::apply_in_pricer(const Constraint& constraint,
+                                                      const Real64 dual, Pricer& pricer)
 {
     ZoneScopedC(TRACY_COLOUR);
 
     // Get the constraint data.
-    const auto& pseudo_corridor_constraint = *static_cast<const PseudoCorridorConstraint*>(&constraint);
-    const auto a1 = pseudo_corridor_constraint.a1;
-    const auto a2 = pseudo_corridor_constraint.a2;
-    const auto& a1_ets = pseudo_corridor_constraint.a1_ets;
-    const auto& a2_ets = pseudo_corridor_constraint.a2_ets;
+    const auto& [a1, a2, a1_ets, a2_ets] =
+        *reinterpret_cast<const ConstraintData*>(constraint.data());
 
     // Add the dual solution to the reduced cost function.
-    auto& pricer = problem_.pricer();
     for (const auto et : a1_ets)
     {
         pricer.add_edgetime_penalty_one_agent(a1, et, -dual);
@@ -209,32 +201,36 @@ void PseudoCorridorConflictSeparator::add_pricing_costs(const Constraint& constr
     }
 }
 
-Float PseudoCorridorConflictSeparator::get_coeff(const Constraint& constraint, const Agent a, const Path& path)
+Real64 PseudoCorridorConflictSeparator::get_coeff(const Constraint& constraint, const Agent a,
+                                                  const Path& path)
 {
     ZoneScopedC(TRACY_COLOUR);
 
     // Get the constraint data.
-    const auto& pseudo_corridor_constraint = *static_cast<const PseudoCorridorConstraint*>(&constraint);
-    const auto a1 = pseudo_corridor_constraint.a1;
-    const auto a2 = pseudo_corridor_constraint.a2;
-    const auto& a1_ets = pseudo_corridor_constraint.a1_ets;
-    const auto& a2_ets = pseudo_corridor_constraint.a2_ets;
+    const auto& [a1, a2, a1_ets, a2_ets] =
+        *reinterpret_cast<const ConstraintData*>(constraint.data());
 
     // Calculate coefficient.
-    return (a == a1 && calculate_a1_coeff(a1_ets, path)) || (a == a2 && calculate_a2_coeff(a2_ets, path));
+    return (a == a1 && calculate_a1_coeff(a1_ets, path)) ||
+           (a == a2 && calculate_a2_coeff(a2_ets, path));
 }
 
-Bool PseudoCorridorConflictSeparator::calculate_a1_coeff(const Array<EdgeTime, 4>& ets, const Path& path)
+Bool PseudoCorridorConflictSeparator::calculate_a1_coeff(const Array<EdgeTime, 4>& ets,
+                                                         const Path& path)
 {
     ZoneScopedC(TRACY_COLOUR);
 
-    return calculate_move_edgetime_coeff(ets[0], path) + calculate_move_edgetime_coeff(ets[1], path) +
-           calculate_wait_edgetime_coeff(ets[2], path) + calculate_wait_edgetime_coeff(ets[3], path);
+    return calculate_move_edgetime_coeff(ets[0], path) +
+           calculate_move_edgetime_coeff(ets[1], path) +
+           calculate_wait_edgetime_coeff(ets[2], path) +
+           calculate_wait_edgetime_coeff(ets[3], path);
 }
 
-Bool PseudoCorridorConflictSeparator::calculate_a2_coeff(const Array<EdgeTime, 2>& ets, const Path& path)
+Bool PseudoCorridorConflictSeparator::calculate_a2_coeff(const Array<EdgeTime, 2>& ets,
+                                                         const Path& path)
 {
     ZoneScopedC(TRACY_COLOUR);
 
-    return calculate_move_edgetime_coeff(ets[0], path) + calculate_move_edgetime_coeff(ets[1], path);
+    return calculate_move_edgetime_coeff(ets[0], path) +
+           calculate_move_edgetime_coeff(ets[1], path);
 }

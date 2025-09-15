@@ -5,13 +5,15 @@ Noncommercial License 1.0.0. A copy of this license can found in LICENSE.md.
 Author: Edward Lam <ed@ed-lam.com>
 */
 
+#ifdef USE_INDEPENDENT_TIME_INTERVAL_ASTAR_PRICER
+
 #pragma once
 
-#include "master/master.h"
+#include "master/status.h"
 #include "pricing/distance_heuristic.h"
 #include "pricing/independent_time_interval_astar.h"
 #include "pricing/partial_pricing.h"
-#include "pricing/pricer.h"
+#include "pricing/pricer_base.h"
 
 class IndependentTimeIntervalAStarPricer : public PricerBase
 {
@@ -32,14 +34,22 @@ class IndependentTimeIntervalAStarPricer : public PricerBase
     ~IndependentTimeIntervalAStarPricer() = default;
     IndependentTimeIntervalAStarPricer(const IndependentTimeIntervalAStarPricer&) noexcept = delete;
     IndependentTimeIntervalAStarPricer(IndependentTimeIntervalAStarPricer&&) noexcept = delete;
-    IndependentTimeIntervalAStarPricer& operator=(const IndependentTimeIntervalAStarPricer&) noexcept = delete;
-    IndependentTimeIntervalAStarPricer& operator=(IndependentTimeIntervalAStarPricer&&) noexcept = delete;
+    IndependentTimeIntervalAStarPricer& operator=(
+        const IndependentTimeIntervalAStarPricer&) noexcept = delete;
+    IndependentTimeIntervalAStarPricer& operator=(IndependentTimeIntervalAStarPricer&&) noexcept =
+        delete;
 
     // Pricer type
-    constexpr static auto name() { return "Independent time-interval A*"; }
+    constexpr static auto name()
+    {
+        return "Independent time-interval A*";
+    }
 
     // Getters
-    auto& distance_heuristic() { return distance_heuristic_; }
+    auto& distance_heuristic()
+    {
+        return distance_heuristic_;
+    }
 
     // Set nodetime branching decisions and cost constant
     void add_waypoint(const Agent a, const NodeTime nt);
@@ -47,33 +57,37 @@ class IndependentTimeIntervalAStarPricer : public PricerBase
 
     // Add nodetime costs
     void add_nodetime_penalty_all_agents(const NodeTime nt, const Cost cost);
-    void add_nodetime_penalty_all_except_one_agent(const Agent a, const NodeTime nt, const Cost cost);
+    void add_nodetime_penalty_all_except_one_agent(const Agent a, const NodeTime nt,
+                                                   const Cost cost);
     void add_nodetime_penalty_one_agent(const Agent a, const NodeTime nt, const Cost cost);
 
     // Add edgetime costs
     void add_edgetime_penalty_all_agents(const EdgeTime et, const Cost cost);
-    void add_edgetime_penalty_all_except_one_agent(const Agent a, const EdgeTime et, const Cost cost);
+    void add_edgetime_penalty_all_except_one_agent(const Agent a, const EdgeTime et,
+                                                   const Cost cost);
     void add_edgetime_penalty_one_agent(const Agent a, const EdgeTime et, const Cost cost);
 
     // Add end costs
     void add_end_penalty_all_agents(const Time earliest, const Time latest, const Cost cost);
-    void add_end_penalty_all_except_one_agent(const Agent a, const Time earliest, const Time latest, const Cost cost);
-    void add_end_penalty_one_agent(const Agent a, const Time earliest, const Time latest, const Cost cost);
+    void add_end_penalty_all_except_one_agent(const Agent a, const Time earliest, const Time latest,
+                                              const Cost cost);
+    void add_end_penalty_one_agent(const Agent a, const Time earliest, const Time latest,
+                                   const Cost cost);
 
     // Add costs for once-off penalties
-    template<OnceOffDirection d = OnceOffDirection::GEq>
-    void add_once_off_penalty_all_except_one_agent(const Agent a, const NodeTime nt, const Cost cost);
-    template<OnceOffDirection d = OnceOffDirection::GEq>
+    template <OnceOffDirection d = OnceOffDirection::GEq>
+    void add_once_off_penalty_all_except_one_agent(const Agent a, const NodeTime nt,
+                                                   const Cost cost);
+    template <OnceOffDirection d = OnceOffDirection::GEq>
     void add_once_off_penalty_one_agent(const Agent a, const NodeTime nt, const Cost cost);
 
     // Add costs for rectangle penalties
-    void add_rectangle_penalty_one_agent(const Agent a,
-                                         const EdgeTime first_entry,
-                                         const EdgeTime first_exit,
-                                         const Time length,
-                                         const Node n_increment,
-                                         const Cost cost);
+    void add_rectangle_penalty_one_agent(const Agent a, const EdgeTime first_entry,
+                                         const EdgeTime first_exit, const Time length,
+                                         const Node n_increment, const Cost cost);
 
     // Solve
     Cost solve();
 };
+
+#endif

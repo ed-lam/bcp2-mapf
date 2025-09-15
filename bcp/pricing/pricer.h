@@ -7,34 +7,23 @@ Author: Edward Lam <ed@ed-lam.com>
 
 #pragma once
 
-#include "types/basic_types.h"
-#include "types/clock.h"
+#include "pricing/independent_time_expanded_astar_pricer.h"
+#include "pricing/independent_time_interval_astar_pricer.h"
+#include "pricing/shared_time_expanded_astar_pricer.h"
+#include "pricing/shared_time_interval_astar_pricer.h"
 
-class PricerBase
-{
-    Clock clock_;
+#ifdef USE_INDEPENDENT_TIME_EXPANDED_ASTAR_PRICER
+using Pricer = IndependentTimeExpandedAStarPricer;
+#endif
 
-  protected:
-    Size num_added_;
+#ifdef USE_INDEPENDENT_TIME_INTERVAL_ASTAR_PRICER
+using Pricer = IndependentTimeIntervalAStarPricer;
+#endif
 
-  public:
-    // Constructors and destructor
-    PricerBase() : clock_(), num_added_(0) {}
-    ~PricerBase() = default;
-    PricerBase(const PricerBase&) noexcept = delete;
-    PricerBase(PricerBase&&) noexcept = delete;
-    PricerBase& operator=(const PricerBase&) noexcept = delete;
-    PricerBase& operator=(PricerBase&&) noexcept = delete;
+#ifdef USE_SHARED_TIME_EXPANDED_ASTAR_PRICER
+using Pricer = SharedTimeExpandedAStarPricer;
+#endif
 
-    // Statistics
-    auto num_added() const { return num_added_; }
-    auto run_time() const { return clock_.total_duration(); }
-
-    // Solve
-    auto run()
-    {
-        auto timer = clock_.start_timer();
-        return solve();
-    }
-    virtual Cost solve() = 0;
-};
+#ifdef USE_SHARED_TIME_INTERVAL_ASTAR_PRICER
+using Pricer = SharedTimeIntervalAStarPricer;
+#endif

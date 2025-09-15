@@ -23,7 +23,10 @@ class NegativeNodeTimeBrancher : public Brancher
     using Brancher::Brancher;
 
     // Bracner type
-    constexpr static auto name() { return "Negative node-time"; }
+    constexpr static auto name()
+    {
+        return "Negative node-time";
+    }
 
     // Branch
     Decisions branch();

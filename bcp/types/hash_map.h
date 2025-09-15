@@ -11,63 +11,50 @@ Author: Edward Lam <ed@ed-lam.com>
 #include <boost/unordered/unordered_flat_map.hpp>
 #include <boost/unordered/unordered_flat_set.hpp>
 
-template<class Key,
-         class T,
-         class Hash = boost::hash<Key>,
-         class KeyEqual = std::equal_to<Key>,
-         class Allocator = std::allocator<std::pair<const Key, T>>>
+template <class Key, class T, class Hash = boost::hash<Key>, class KeyEqual = std::equal_to<Key>,
+          class Allocator = std::allocator<std::pair<const Key, T>>>
 using HashMap = boost::unordered_flat_map<Key, T, Hash, KeyEqual, Allocator>;
 
-template<class Key,
-         class Hash = boost::hash<Key>,
-         class KeyEqual = std::equal_to<Key>,
-         class Allocator = std::allocator<Key>>
+template <class Key, class Hash = boost::hash<Key>, class KeyEqual = std::equal_to<Key>,
+          class Allocator = std::allocator<Key>>
 using HashSet = boost::unordered_flat_set<Key, Hash, KeyEqual, Allocator>;
 
-inline std::size_t hash_value(const XYT xyt) noexcept
+inline Hash hash_value(const XYT xyt) noexcept
 {
-    static_assert(sizeof(XYT) == sizeof(UInt64));
-    return boost::hash<decltype(xyt.id)>{}(xyt.id);
+    return boost::hash<UInt64>()(xyt.id());
 }
 
-inline std::size_t hash_value(const NodeTime nt) noexcept
+inline Hash hash_value(const NodeTime nt) noexcept
 {
-    static_assert(sizeof(NodeTime) == sizeof(UInt64));
-    return boost::hash<decltype(nt.id)>{}(nt.id);
+    return boost::hash<UInt64>()(nt.id());
 }
 
-inline std::size_t hash_value(const Edge e) noexcept
+inline Hash hash_value(const Edge e) noexcept
 {
-    static_assert(sizeof(Edge) == sizeof(UInt32));
-    return boost::hash<decltype(e.id)>{}(e.id);
+    return boost::hash<UInt32>()(e.id());
 }
 
-inline std::size_t hash_value(const EdgeTime et) noexcept
+inline Hash hash_value(const EdgeTime et) noexcept
 {
-    static_assert(sizeof(EdgeTime) == sizeof(UInt64));
-    return boost::hash<decltype(et.id)>{}(et.id);
+    return boost::hash<UInt64>()(et.id());
 }
 
-inline std::size_t hash_value(const AgentNode an) noexcept
+inline Hash hash_value(const AgentNode an) noexcept
 {
-    static_assert(sizeof(AgentNode) == sizeof(UInt64));
-    return boost::hash<decltype(an.id)>{}(an.id);
+    return boost::hash<UInt64>()(an.id());
 }
 
-inline std::size_t hash_value(const AgentTime at) noexcept
+inline Hash hash_value(const AgentTime at) noexcept
 {
-    static_assert(sizeof(AgentTime) == sizeof(UInt64));
-    return boost::hash<decltype(at.id)>{}(at.id);
+    return boost::hash<UInt64>()(at.id());
 }
 
-inline std::size_t hash_value(const AgentNodeTime ant) noexcept
+inline Hash hash_value(const AgentNodeTime ant) noexcept
 {
-    static_assert(sizeof(AgentNodeTime) == sizeof(UInt64));
-    return boost::hash<decltype(ant.id)>{}(ant.id);
+    return boost::hash<UInt64>()(ant.id());
 }
 
-inline std::size_t hash_value(const AgentAgent aa) noexcept
+inline Hash hash_value(const AgentAgent aa) noexcept
 {
-    static_assert(sizeof(AgentAgent) == sizeof(UInt64));
-    return boost::hash<decltype(aa.id)>{}(aa.id);
+    return boost::hash<UInt64>()(aa.id());
 }

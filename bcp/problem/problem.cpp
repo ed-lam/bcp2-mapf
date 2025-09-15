@@ -7,10 +7,10 @@ Author: Edward Lam <ed@ed-lam.com>
 
 // #define PRINT_DEBUG
 
-#include "output/formatting.h"
-#include "problem/debug.h"
 #include "problem/problem.h"
+#include "output/formatting.h"
 #include "problem/runtime_tests.h"
+#include "types/debug.h"
 #include "types/tracy.h"
 #include <fmt/ranges.h>
 
@@ -43,7 +43,7 @@ Problem::Problem(const FilePath& scenario_path, const Agent agent_limit) :
     branchers_(instance_, *this),
     heuristics_(instance_, *this),
 
-    ub_(INF),
+    ub_(COST_INF),
     sol_(),
     projection_(instance_, *this),
 
@@ -59,7 +59,7 @@ Problem::Problem(const FilePath& scenario_path, const Agent agent_limit) :
     test_flexible_array_pointers();
 
     // Create initial constraints.
-    std::apply([](auto& ...separator) { return (separator.run(), ...); }, initial_constraints_);
+    initial_constraints_.apply([](auto&... separator) { return (separator.run(), ...); });
 }
 
 Cost Problem::lb() const
@@ -76,7 +76,7 @@ Cost Problem::ub() const
     return ub_;
 }
 
-Float Problem::gap() const
+Real64 Problem::gap() const
 {
     ZoneScopedC(TRACY_COLOUR);
 
@@ -85,7 +85,7 @@ Float Problem::gap() const
     return (ub_val - lb_val) / ub_val;
 }
 
-void Problem::solve(const Float time_limit)
+void Problem::solve(const Real64 time_limit)
 {
     ZoneScopedC(TRACY_COLOUR);
 
@@ -110,7 +110,9 @@ void Problem::solve(const Float time_limit)
             // Skip the current node if its lower bound is higher than the upper bound.
             if (is_ge(eps_ceil(bbtree_.current_lb()), ub()))
             {
-                debugln("Discarding BB tree node {}, lb {}", bbtree_.current_id(), bbtree_.current_lb());
+                DEBUGLN("Discarding BB tree node {}, lb {}",
+                        bbtree_.current_id(),
+                        bbtree_.current_lb());
                 if constexpr (BBTree::is_best_first_search())
                 {
                     print_node_log();
@@ -124,9 +126,13 @@ void Problem::solve(const Float time_limit)
             }
 
             // Print statistics.
-            debugln("BB tree has {} nodes remaining, lb {}, ub {}", bbtree_.size(), bbtree_.lb(), ub());
-            debugln("Solving node {} (lb {}, depth {}, parent {})",
-                    bbtree_.current_id(), bbtree_.current_depth(), bbtree_.current_lb(), bbtree_.current_parent_id());
+            DEBUGLN(
+                "BB tree has {} nodes remaining, lb {}, ub {}", bbtree_.size(), bbtree_.lb(), ub());
+            DEBUGLN("Solving node {} (lb {}, depth {}, parent {})",
+                    bbtree_.current_id(),
+                    bbtree_.current_depth(),
+                    bbtree_.current_lb(),
+                    bbtree_.current_parent_id());
 
             // Start the node.
             master_.start_node(bbtree_.current());
@@ -138,7 +144,7 @@ void Problem::solve(const Float time_limit)
             }
 
             // Reset history of objective value to check for stalled LP.
-            std::fill(master_obj_history_.begin(), master_obj_history_.end(), std::numeric_limits<Cost>::quiet_NaN());
+            std::fill(master_obj_history_.begin(), master_obj_history_.end(), COST_NAN);
 
             // LP, price and cut loop.
             do
@@ -150,7 +156,7 @@ void Problem::solve(const Float time_limit)
 
                 // Solve the master problem.
                 master_.solve();
-                debug_assert(master_.status() != MasterProblemStatus::Unknown);
+                DEBUG_ASSERT(master_.status() != MasterProblemStatus::Unknown);
 
                 // Print log.
                 if (bbtree_.current_id() == 0 && iter_ >= next_log_iter_)
@@ -174,7 +180,8 @@ void Problem::solve(const Float time_limit)
                 projection_.update();
 
                 // Interrupt and proceed to branch if the LP objective value is stalled.
-                if (master_.status() == MasterProblemStatus::Fractional && branch_early(master_.obj()))
+                if (master_.status() == MasterProblemStatus::Fractional &&
+                    branch_early(master_.obj()))
                 {
                     goto NODE_STALLED;
                 }
@@ -186,7 +193,7 @@ void Problem::solve(const Float time_limit)
                 //     add_debug_paths();
                 // }
                 // added_debug_paths = true;
-                // const auto new_lb = std::numeric_limits<Cost>::quiet_NaN();
+                // const auto new_lb = COST_NAN;
 
                 // Generate columns.
                 const auto new_lb = pricer_.run();
@@ -199,10 +206,13 @@ void Problem::solve(const Float time_limit)
                     // Update the node lower bound.
                     bbtree_.update_node_lb(new_lb);
 
-                    // Skip the current node if its lower bound is higher than the upper bound.
+                    // Skip the current node if its lower bound is higher than the upper
+                    // bound.
                     if (is_ge(eps_ceil(bbtree_.current_lb()), ub()))
                     {
-                        debugln("Discarding BB tree node {}, lb {}", bbtree_.current_id(), bbtree_.current_lb());
+                        DEBUGLN("Discarding BB tree node {}, lb {}",
+                                bbtree_.current_id(),
+                                bbtree_.current_lb());
                         goto NODE_COMPLETED;
                     }
                 }
@@ -211,10 +221,12 @@ void Problem::solve(const Float time_limit)
                 if (master_.status() != MasterProblemStatus::Infeasible && !master_.vars_added())
                 {
                     // Create cuts.
-                    std::apply([](auto& ...separator) { return (separator.run(), ...); }, lazy_constraints_);
+                    lazy_constraints_.apply([](auto&... separator)
+                                            { return (separator.run(), ...); });
 
                     // Store the result if the LP is integer feasible.
-                    if (master_.status() == MasterProblemStatus::Integer && !master_.constrs_added())
+                    if (master_.status() == MasterProblemStatus::Integer &&
+                        !master_.constrs_added())
                     {
                         // Increment the number of feasible solutions found by the LP.
                         ++lp_num_feasible_;
@@ -235,21 +247,24 @@ void Problem::solve(const Float time_limit)
                                         break;
                                     }
                                 }
-        #ifdef DEBUG
+#ifdef DEBUG
                             check_solution(sol_, ub());
-        #endif
+#endif
                             ++lp_num_improving_;
 
                             // Print log.
                             print_sol_log("LP relaxation");
-                            next_log_iter_ = iter_ +
-                                (bbtree_.current_id() == 0 ? PRINT_LOG_ROOT_ITERATIONS : PRINT_LOG_NODE_ITERATIONS);
+                            next_log_iter_ =
+                                iter_ + (bbtree_.current_id() == 0 ? PRINT_LOG_ROOT_ITERATIONS :
+                                                                     PRINT_LOG_NODE_ITERATIONS);
 
-                            // Skip the current node if its lower bound is higher than the upper bound.
+                            // Skip the current node if its lower bound is higher than the upper
+                            // bound.
                             if (is_ge(eps_ceil(bbtree_.current_lb()), ub()))
                             {
-                                debugln("Discarding BB tree node {}, lb {}",
-                                        bbtree_.current_id(), bbtree_.current_lb());
+                                DEBUGLN("Discarding BB tree node {}, lb {}",
+                                        bbtree_.current_id(),
+                                        bbtree_.current_lb());
                                 goto NODE_COMPLETED;
                             }
                         }
@@ -259,17 +274,15 @@ void Problem::solve(const Float time_limit)
                 // Run primal heuristics.
                 if (master_.status() != MasterProblemStatus::Infeasible)
                 {
-                    const auto cutoff = std::apply(
-                        [&](auto& ...heuristic) { return (run_primal_heuristic(heuristic) || ...); },
-                        heuristics_
-                    );
+                    const auto cutoff =
+                        heuristics_.apply([&](auto&... heuristic)
+                                          { return (run_primal_heuristic(heuristic) || ...); });
                     if (cutoff)
                     {
                         goto NODE_COMPLETED;
                     }
                 }
-            }
-            while (master_.changed());
+            } while (master_.changed());
 
             // Update the node lower bound.
             bbtree_.update_node_lb(master_.obj());
@@ -277,30 +290,30 @@ void Problem::solve(const Float time_limit)
             // Skip the current node if its lower bound is higher than the upper bound.
             if (is_ge(eps_ceil(bbtree_.current_lb()), ub()))
             {
-                debugln("Discarding BB tree node {}, lb {}", bbtree_.current_id(), bbtree_.current_lb());
+                DEBUGLN("Discarding BB tree node {}, lb {}",
+                        bbtree_.current_id(),
+                        bbtree_.current_lb());
                 goto NODE_COMPLETED;
             }
 
             // Branch.
             if (master_.status() == MasterProblemStatus::Fractional)
             {
-                NODE_STALLED:
+            NODE_STALLED:
 
                 // Store basis in the node. Also delete old columns and rows.
                 master_.store_basis(bbtree_.current());
 
                 // Run the branchers.
-                const auto success = std::apply(
-                    [&](auto& ...brancher) { return (run_brancher(brancher) || ...); },
-                    branchers_
-                );
+                const auto success = branchers_.apply([&](auto&... brancher)
+                                                      { return (run_brancher(brancher) || ...); });
                 if (success)
                 {
                     goto BRANCHED;
                 }
-                err("All branchers failed to make a decision");
+                ERROR("All branchers failed to make a decision");
             }
-            BRANCHED:
+        BRANCHED:
 
             // Print log.
             if (bbtree_.current_id() == 0 || iter_ >= next_log_iter_)
@@ -309,8 +322,8 @@ void Problem::solve(const Float time_limit)
                 next_log_iter_ = iter_ + PRINT_LOG_NODE_ITERATIONS;
             }
 
-            // Completed solving the node.
-            NODE_COMPLETED:;
+        // Completed solving the node.
+        NODE_COMPLETED:;
 
             // Print paths.
             // print_paths();
@@ -336,8 +349,9 @@ void Problem::store_master_obj_history(const Cost master_obj)
     master_obj_history_.back() = master_obj;
 
     // Print.
-    debugln("");
-    debugln("    LP history: {}", fmt::join(master_obj_history_.begin(), master_obj_history_.end(), " "));
+    DEBUGLN("");
+    DEBUGLN("    LP history: {}",
+            fmt::join(master_obj_history_.begin(), master_obj_history_.end(), " "));
 }
 
 Bool Problem::branch_early(const Cost master_obj)
@@ -348,18 +362,19 @@ Bool Problem::branch_early(const Cost master_obj)
     store_master_obj_history(master_obj);
 
     // Check if stalled.
-    for (Size idx = 0; idx < STALLED_NUM_ROUNDS - 1; ++idx)
+    for (Size64 idx = 0; idx < STALLED_NUM_ROUNDS - 1; ++idx)
     {
         const auto change = master_obj_history_[idx + 1] - master_obj_history_[idx];
-        debugln("    LP absolute change {}", change);
+        DEBUGLN("    LP absolute change {}", change);
 
-        // Stalled if change is positive (due to cuts) or less than a given amount. Handle NaN using double negation.
+        // Stalled if change is positive (due to cuts) or less than a given amount. Handle NaN using
+        // double negation.
         if (!(change <= 0 && change > STALLED_ABSOLUTE_CHANGE))
         {
             return false;
         }
     }
-    debugln("    Stalled");
+    DEBUGLN("    Stalled");
     return true;
 }
 
@@ -367,12 +382,12 @@ void Problem::update_ub(const Cost ub)
 {
     ZoneScopedC(TRACY_COLOUR);
 
-    debug_assert(is_integral(ub));
+    DEBUG_ASSERT(is_integral(ub));
     ub_ = std::min(ub_, eps_round(ub));
-    debugln("Updated UB to {}", ub_);
+    DEBUGLN("Updated UB to {}", ub_);
 }
 
-template<class T>
+template <class T>
 Bool Problem::run_primal_heuristic(T& heuristic)
 {
     ZoneScopedC(TRACY_COLOUR);
@@ -382,7 +397,7 @@ Bool Problem::run_primal_heuristic(T& heuristic)
 
     // Run the primal heuristic.
     auto [sol_cost, sol] = heuristic.run();
-    debug_assert(is_ge(sol_cost, bbtree_.current_lb()));
+    DEBUG_ASSERT(is_ge(sol_cost, bbtree_.current_lb()));
 
     // Store improving solution.
     if (sol_cost < ub())
@@ -397,20 +412,21 @@ Bool Problem::run_primal_heuristic(T& heuristic)
 
         // Print log.
         print_sol_log(heuristic.name());
-        next_log_iter_ = iter_ +
-            (bbtree_.current_id() == 0 ? PRINT_LOG_ROOT_ITERATIONS : PRINT_LOG_NODE_ITERATIONS);
+        next_log_iter_ = iter_ + (bbtree_.current_id() == 0 ? PRINT_LOG_ROOT_ITERATIONS :
+                                                              PRINT_LOG_NODE_ITERATIONS);
 
         // Skip the current node if its lower bound is higher than the upper bound.
         if (is_ge(eps_ceil(bbtree_.current_lb()), ub()))
         {
-            debugln("Discarding BB tree node {}, lb {}", bbtree_.current_id(), bbtree_.current_lb());
+            DEBUGLN(
+                "Discarding BB tree node {}, lb {}", bbtree_.current_id(), bbtree_.current_lb());
             return true;
         }
     }
     return false;
 }
 
-template<class T>
+template <class T>
 Bool Problem::run_brancher(T& brancher)
 {
     ZoneScopedC(TRACY_COLOUR);
@@ -432,9 +448,9 @@ void Problem::print_log_separator() const
     ZoneScopedC(TRACY_COLOUR);
 
 #ifdef DEBUG
-    println("{:-^156}", "");
+    PRINTLN("{:-^156}", "");
 #else
-    println("{:-^143}", "");
+    PRINTLN("{:-^143}", "");
 #endif
 }
 
@@ -443,7 +459,7 @@ void Problem::print_log_header()
     ZoneScopedC(TRACY_COLOUR);
 
     print_log_separator();
-    println("{:>8s} | "
+    PRINTLN("{:>8s} | "
             "{:>9s} | "
             "{:>8s} | "
             "{:>8s} | "
@@ -486,12 +502,13 @@ void Problem::print_node_log()
     }
 
     const auto master_obj = master_.obj();
-    const auto master_obj_str = (std::isfinite(master_obj) ? fmt::format("{:10.2f}", master_obj) : "-");
+    const auto master_obj_str =
+        (std::isfinite(master_obj) ? fmt::format("{:10.2f}", master_obj) : "-");
     const auto ub_val = ub();
     const auto lb_val = lb();
     const auto gap = (ub_val - lb_val) / ub_val;
     const auto gap_str = std::isfinite(gap) ? fmt::format("{:7.2f}%", gap * 100.0) : "-";
-    println("{:>8.2f} | "
+    PRINTLN("{:>8.2f} | "
             "{:>9d} | "
             "{:>8d} | "
             "{:>8d} | "
@@ -534,13 +551,14 @@ void Problem::print_sol_log(const String& found_by)
     }
 
     const auto master_obj = master_.obj();
-    const auto master_obj_str = (std::isfinite(master_obj) ? fmt::format("{:10.2f}", master_obj) : "-");
+    const auto master_obj_str =
+        (std::isfinite(master_obj) ? fmt::format("{:10.2f}", master_obj) : "-");
     const auto ub_val = ub();
     const auto bbtree_lb_val = bbtree_.lb();
     const auto lb_val = std::min(bbtree_lb_val, ub_val);
     const auto gap = (ub_val - lb_val) / ub_val;
     const auto gap_str = std::isfinite(gap) ? fmt::format("{:7.2f}%", gap * 100.0) : "-";
-    println("{:>8.2f} | "
+    PRINTLN("{:>8.2f} | "
             "{:>9d} | "
             "{:>8d} | "
             "{:>8d} | "
@@ -583,93 +601,95 @@ void Problem::print_results() const
         const auto num_nodes = bbtree_.num_closed();
         const auto lb_val = eps_ceil(lb());
         const auto ub_val = ub();
-        const auto status = (lb_val == INF    ? "Infeasible" :
-                             ub_val == INF    ? "Unknown" :
-                             lb_val == ub_val ? "Optimal" :
-                                                "Feasible");
+        const auto status = (lb_val == COST_INF ? "Infeasible" :
+                             ub_val == COST_INF ? "Unknown" :
+                             lb_val == ub_val   ? "Optimal" :
+                                                  "Feasible");
         const auto gap = (ub_val - lb_val) / ub_val;
         const auto gap_str = std::isfinite(gap) ? fmt::format("{:.2f}%", gap * 100.0) : "-";
-        println("");
-        println("{:<13} {:<.2f} seconds", "Solve time:", solve_time);
-        println("{:<13} {}", "Status:", status);
-        println("{:<13} {}", "Nodes solved:", num_nodes);
-        println("{:<13} {:.0f}", "Upper bound:", ub_val);
-        println("{:<13} {:.0f}", "Lower bound:", lb_val);
-        println("{:<13} {}", "Gap:", gap_str);
+        PRINTLN("");
+        PRINTLN("{:<13} {:<.2f} seconds", "Solve time:", solve_time);
+        PRINTLN("{:<13} {}", "Status:", status);
+        PRINTLN("{:<13} {}", "Nodes solved:", num_nodes);
+        PRINTLN("{:<13} {:.0f}", "Upper bound:", ub_val);
+        PRINTLN("{:<13} {:.0f}", "Lower bound:", lb_val);
+        PRINTLN("{:<13} {}", "Gap:", gap_str);
     }
 
     // Print pricers statistics.
     {
-        println("");
-        println("{:-^57}", "");
-        println("{:<28s} | "
+        PRINTLN("");
+        PRINTLN("{:-^57}", "");
+        PRINTLN("{:<28s} | "
                 "{:>8s} | "
                 "{:>15s}",
                 "Pricer",
                 "Time",
                 "Columns Added");
-        println("{:-^57}", "");
-        println("{:<28s} | "
+        PRINTLN("{:-^57}", "");
+        PRINTLN("{:<28s} | "
                 "{:8.2f} | "
                 "{:15d}",
                 pricer_.name(),
                 pricer_.run_time(),
                 pricer_.num_added());
-        println("{:-^57}", "");
+        PRINTLN("{:-^57}", "");
     }
 
     // Print separators statistics.
     {
-        println("");
-        println("{:-^57}", "");
-        println("{:<28s} | "
+        PRINTLN("");
+        PRINTLN("{:-^57}", "");
+        PRINTLN("{:<28s} | "
                 "{:>8s} | "
                 "{:>15s}",
                 "Separator",
                 "Time",
                 "Rows Added");
-        println("{:-^57}", "");
-        constexpr auto f = [](const auto& x) {
-            println("{:<28s} | "
+        PRINTLN("{:-^57}", "");
+        constexpr auto f = [](const auto& x)
+        {
+            PRINTLN("{:<28s} | "
                     "{:8.2f} | "
                     "{:15d}",
                     x.name(),
                     x.run_time(),
                     x.num_added());
         };
-        std::apply([&](auto& ...subroutine) { (f(subroutine), ...); }, initial_constraints_);
-        std::apply([&](auto& ...subroutine) { (f(subroutine), ...); }, lazy_constraints_);
-        println("{:-^57}", "");
+        initial_constraints_.apply([&](auto&... subroutine) { (f(subroutine), ...); });
+        lazy_constraints_.apply([&](auto&... subroutine) { (f(subroutine), ...); });
+        PRINTLN("{:-^57}", "");
     }
 
     // Print branchers statistics.
     {
-        println("");
-        println("{:-^57}", "");
-        println("{:<28s} | "
+        PRINTLN("");
+        PRINTLN("{:-^57}", "");
+        PRINTLN("{:<28s} | "
                 "{:>8s} | "
                 "{:>15s}",
                 "Brancher",
                 "Time",
                 "Nodes Added");
-        println("{:-^57}", "");
-        constexpr auto f = [](const auto& x) {
-            println("{:<28s} | "
+        PRINTLN("{:-^57}", "");
+        constexpr auto f = [](const auto& x)
+        {
+            PRINTLN("{:<28s} | "
                     "{:8.2f} | "
                     "{:15d}",
                     x.name(),
                     x.run_time(),
                     x.num_added());
         };
-        std::apply([&](auto& ...subroutine) { (f(subroutine), ...); }, branchers_);
-        println("{:-^57}", "");
+        branchers_.apply([&](auto&... subroutine) { (f(subroutine), ...); });
+        PRINTLN("{:-^57}", "");
     }
 
     // Print primal heuristics statistics.
     {
-        println("");
-        println("{:-^75}", "");
-        println("{:<28s} | "
+        PRINTLN("");
+        PRINTLN("{:-^75}", "");
+        PRINTLN("{:<28s} | "
                 "{:>8s} | "
                 "{:>15s} | "
                 "{:>15s}",
@@ -677,14 +697,18 @@ void Problem::print_results() const
                 "Time",
                 "Improving Found",
                 "Feasible Found");
-        println("{:-^75}", "");
-        println("{:<28s} | "
+        PRINTLN("{:-^75}", "");
+        PRINTLN("{:<28s} | "
                 "{:8.2f} | "
                 "{:15d} | "
                 "{:15d}",
-                "LP relaxation", master_.run_time(), lp_num_improving_, lp_num_feasible_);
-        constexpr auto f = [](const auto& x) {
-            println("{:<28s} | "
+                "LP relaxation",
+                master_.run_time(),
+                lp_num_improving_,
+                lp_num_feasible_);
+        constexpr auto f = [](const auto& x)
+        {
+            PRINTLN("{:<28s} | "
                     "{:8.2f} | "
                     "{:15d} | "
                     "{:15d}",
@@ -693,32 +717,32 @@ void Problem::print_results() const
                     x.num_improving(),
                     x.num_feasible());
         };
-        std::apply([&](auto& ...subroutine) { (f(subroutine), ...); }, heuristics_);
-        println("{:-^75}", "");
+        heuristics_.apply([&](auto&... subroutine) { (f(subroutine), ...); });
+        PRINTLN("{:-^75}", "");
     }
 
     // Print statistics for other activities.
     {
-        println("");
-        println("{:-^39}", "");
-        println("{:<28s} | "
+        PRINTLN("");
+        PRINTLN("{:-^39}", "");
+        PRINTLN("{:<28s} | "
                 "{:>8s}",
                 "Other Activities",
                 "Time");
-        println("{:-^39}", "");
-        println("{:<28s} | "
+        PRINTLN("{:-^39}", "");
+        PRINTLN("{:<28s} | "
                 "{:8.2f}",
                 "Projection",
                 projection_.run_time());
-        println("{:-^39}", "");
+        PRINTLN("{:-^39}", "");
     }
 
     // Print solution.
 #ifndef DEBUG
     if (!sol_.empty())
     {
-        println("");
-        println("Solution:");
+        PRINTLN("");
+        PRINTLN("Solution:");
         print_solution(instance_.map, sol_);
     }
 #endif
@@ -726,15 +750,16 @@ void Problem::print_results() const
 
 void Problem::print_paths()
 {
-    println("");
-    println("Paths with cost {:.4f} in B&B node {}, lb {:.4f}, depth {}, condition number {}",
+    PRINTLN("");
+    PRINTLN("Paths with cost {:.4f} in B&B node {}, lb {:.4f}, depth {}, "
+            "condition number {}",
             master_.obj(),
             bbtree_.current_id(),
             bbtree_.current_lb(),
             bbtree_.current_depth(),
             master_.condition_number());
     master_.print_paths();
-    println("");
+    PRINTLN("");
 }
 
 #ifdef DEBUG
@@ -746,7 +771,8 @@ void Problem::check_solution(const Vector<Variable*>& solution, const Cost cost)
     const auto A = instance_.num_agents();
 
     // Check size.
-    release_assert(solution.size() == A, "Solution has {} paths but there are {} agents", solution.size(), A);
+    ASSERT(
+        solution.size() == A, "Solution has {} paths but there are {} agents", solution.size(), A);
 
     // Check for conflicts.
     Cost check_cost = 0.0;
@@ -764,16 +790,16 @@ void Problem::check_solution(const Vector<Variable*>& solution, const Cost cost)
     {
         // Check the start and target.
         const auto& path = solution[a]->path();
-        release_assert(path.front().n == instance_.agents[a].start,
-                       "The path for agent {} starts at {} but its starting location is {}",
-                       a,
-                       format_node(path.front().n, map),
-                       format_node(instance_.agents[a].start, map));
-        release_assert(path.back().n == instance_.agents[a].target,
-                       "The path for agent {} ends at {} but its target location is {}",
-                       a,
-                       format_node(path.back().n, map),
-                       format_node(instance_.agents[a].target, map));
+        ASSERT(path.front().n == instance_.agents[a].start,
+               "The path for agent {} starts at {} but its starting location is {}",
+               a,
+               format_node(path.front().n, map),
+               format_node(instance_.agents[a].start, map));
+        ASSERT(path.back().n == instance_.agents[a].target,
+               "The path for agent {} ends at {} but its target location is {}",
+               a,
+               format_node(path.back().n, map),
+               format_node(instance_.agents[a].target, map));
 
         // Check if the path is in conflict with paths already selected.
         {
@@ -781,25 +807,33 @@ void Problem::check_solution(const Vector<Variable*>& solution, const Cost cost)
             for (; nt.t < path.size() - 1; ++nt.t)
             {
                 nt.n = path[nt.t].n;
-                release_assert(nodetime_in_use.find(nt) == nodetime_in_use.end(),
-                               "Agent {} has a nodetime conflict at {}",
-                               a, format_nodetime(nt, map));
+                ASSERT(nodetime_in_use.find(nt) == nodetime_in_use.end(),
+                       "Agent {} has a nodetime conflict at {}",
+                       a,
+                       format_nodetime(nt, map));
 
                 auto it = target_blocked.find(nt.n);
-                release_assert(it == target_blocked.end() || it->second > nt.t,
-                               "Agent {} is crossing {} at time {} but it is blocked from time {}",
-                               a, format_node(nt.n, map), nt.t, it->second);
+                ASSERT(it == target_blocked.end() || it->second > nt.t,
+                       "Agent {} is crossing {} at time {} but it is blocked from time {}",
+                       a,
+                       format_node(nt.n, map),
+                       nt.t,
+                       it->second);
 
                 EdgeTime et{map.get_undirected_edge(path[nt.t]), nt.t};
-                release_assert(edgetime_in_use.find(et) == edgetime_in_use.end(),
-                               "Agent {} has an edgetime conflict at {}",
-                               a, format_edgetime(et, map));
+                ASSERT(edgetime_in_use.find(et) == edgetime_in_use.end(),
+                       "Agent {} has an edgetime conflict at {}",
+                       a,
+                       format_edgetime(et, map));
             }
             {
                 nt.n = path[nt.t].n;
-                release_assert(target_crossed.at(nt.n) < nt.t,
-                              "Agent {} wants to finish at time {} but another agent is crossing its target at time {}",
-                              a, nt.t, target_crossed.at(nt.n));
+                ASSERT(target_crossed.at(nt.n) < nt.t,
+                       "Agent {} wants to finish at time {} but another agent "
+                       "is crossing its target at time {}",
+                       a,
+                       nt.t,
+                       target_crossed.at(nt.n));
             }
         }
 
@@ -823,7 +857,7 @@ void Problem::check_solution(const Vector<Variable*>& solution, const Cost cost)
             {
                 nt.n = path[nt.t].n;
                 auto& target_blocked_time = target_blocked.at(nt.n);
-                debug_assert(target_blocked_time == TIME_MAX);
+                DEBUG_ASSERT(target_blocked_time == TIME_MAX);
                 target_blocked_time = nt.t;
             }
 
@@ -833,9 +867,10 @@ void Problem::check_solution(const Vector<Variable*>& solution, const Cost cost)
     }
 
     // Check the cost.
-    release_assert(check_cost == cost,
-                   "The solution cost is {} and does not match the expected cost {}",
-                   check_cost, cost);
+    ASSERT(check_cost == cost,
+           "The solution cost is {} and does not match the expected cost {}",
+           check_cost,
+           cost);
 }
 
 #endif
@@ -870,13 +905,14 @@ void Problem::check_solution(const Vector<Variable*>& solution, const Cost cost)
 //             const auto from_n = instance_.map.get_n(path_xy[t]);
 //             path[t] = Edge{from_n, Direction::INVALID};
 //         }
-//         release_assert(path.front().n == instance_.agents[a].start);
-//         release_assert(path.back().n == instance_.agents[a].target);
+//         ASSERT(path.front().n == instance_.agents[a].start);
+//         ASSERT(path.back().n == instance_.agents[a].target);
 //
-//         println("Agent {:3d}: {}", a, format_path_with_time_spaced(path, instance_.map));
+//         PRINTLN("Agent {:3d}: {}", a, format_path_with_time_spaced(path,
+//         instance_.map));
 //
 //         const auto reduced_cost = master_.calculate_reduced_cost(a, path);
-//         println("Reduced cost of path for agent {} = {}", a, reduced_cost);
+//         PRINTLN("Reduced cost of path for agent {} = {}", a, reduced_cost);
 //         if (is_lt(reduced_cost, 0.0))
 //         {
 //             master_.add_column(std::move(variable_ptr), reduced_cost);

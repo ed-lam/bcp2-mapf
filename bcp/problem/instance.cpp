@@ -7,8 +7,8 @@ Author: Edward Lam <ed@ed-lam.com>
 
 // #define PRINT_DEBUG
 
-#include "problem/debug.h"
 #include "problem/instance.h"
+#include "types/debug.h"
 #include <cmath>
 #include <fstream>
 #include <regex>
@@ -24,12 +24,12 @@ Instance::Instance(const FilePath& scenario_path_, const Agent agent_limit_) :
     // Open scenario file.
     std::ifstream scenario_file;
     scenario_file.open(scenario_path, std::ios::in);
-    release_assert(scenario_file.good(), "Cannot find scenario file \"{}\"", scenario_path.string());
+    ASSERT(scenario_file.good(), "Cannot find scenario file \"{}\"", scenario_path.string());
 
     // Read file.
     char buffer[1024];
     scenario_file.getline(buffer, 1024);
-    release_assert(strstr(buffer, "version 1"), "Expecting \"version 1\" scenario file format");
+    ASSERT(strstr(buffer, "version 1"), "Expecting \"version 1\" scenario file format");
 
     // Read agents data.
     const auto agent_limit = agent_limit_ < 0 ? std::numeric_limits<Agent>::max() : agent_limit_;
@@ -40,16 +40,11 @@ Instance::Instance(const FilePath& scenario_path_, const Agent agent_limit_) :
     Position start_y;
     Position target_x;
     Position target_y;
-    Float tmp;
+    Real64 tmp;
     String first_agent_map_path;
-    while (num_agents() < agent_limit &&
-           scenario_file >>
-           tmp >>
-           agent_map_path >>
-           agent_map_width >> agent_map_height >>
-           start_x >> start_y >>
-           target_x >> target_y >>
-           tmp)
+    while (num_agents() < agent_limit && scenario_file >> tmp >> agent_map_path >>
+                                             agent_map_width >> agent_map_height >> start_x >>
+                                             start_y >> target_x >> target_y >> tmp)
     {
         // Add padding.
         agent_map_width += 2;
@@ -77,17 +72,20 @@ Instance::Instance(const FilePath& scenario_path_, const Agent agent_limit_) :
         auto& [start, target] = agents.emplace_back();
         start = map.get_n(start_x, start_y);
         target = map.get_n(target_x, target_y);
-        release_assert(agent_map_path == first_agent_map_path, "Agent {} uses a different map", a);
-        release_assert(agent_map_width == map.width(),
-                       "Map width of agent {} does not match actual map size", a);
-        release_assert(agent_map_height == map.height(),
-                       "Map height of agent {} does not match actual map size", a);
-        release_assert(start < map.size() && map[start], "Agent {} starts at an obstacle", a);
-        release_assert(target < map.size() && map[target], "Agent {} ends at an obstacle", a);
+        ASSERT(agent_map_path == first_agent_map_path, "Agent {} uses a different map", a);
+        ASSERT(agent_map_width == map.width(),
+               "Map width of agent {} does not match actual map size",
+               a);
+        ASSERT(agent_map_height == map.height(),
+               "Map height of agent {} does not match actual map size",
+               a);
+        ASSERT(start < map.size() && map[start], "Agent {} starts at an obstacle", a);
+        ASSERT(target < map.size() && map[target], "Agent {} ends at an obstacle", a);
     }
-    release_assert(agent_limit_ == -1 || num_agents() == agent_limit_,
-                   "Cannot read {} agents from a scenario with only {} agents",
-                   agent_limit_, num_agents());
+    ASSERT(agent_limit_ == -1 || num_agents() == agent_limit_,
+           "Cannot read {} agents from a scenario with only {} agents",
+           agent_limit_,
+           num_agents());
 
     // Close file.
     scenario_file.close();

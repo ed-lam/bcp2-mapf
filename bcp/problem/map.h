@@ -7,7 +7,7 @@ Author: Edward Lam <ed@ed-lam.com>
 
 #pragma once
 
-#include "problem/debug.h"
+#include "types/debug.h"
 #include "types/file_system.h"
 #include "types/map_types.h"
 #include "types/tuple.h"
@@ -15,7 +15,7 @@ Author: Edward Lam <ed@ed-lam.com>
 
 class Map
 {
-    Vector<Bool> passable_;    // Row-major matrix
+    Vector<Bool> passable_; // Row-major matrix
     Position width_ = 0;
     Position height_ = 0;
 
@@ -50,7 +50,7 @@ class Map
     }
     inline Bool operator[](const Node n) const
     {
-        debug_assert(0 <= n && n < size());
+        DEBUG_ASSERT(0 <= n && n < size());
         return passable_[n];
     }
     inline Node get_n(const Position x, const Position y) const
@@ -67,12 +67,12 @@ class Map
     }
     inline Position get_x(const Node n) const
     {
-        // debug_assert(0 <= n && n < size());
+        // DEBUG_ASSERT(0 <= n && n < size());
         return n % width_;
     }
     inline Position get_y(const Node n) const
     {
-        // debug_assert(0 <= n && n < size());
+        // DEBUG_ASSERT(0 <= n && n < size());
         return n / width_;
     }
     inline XY get_xy(const Node n) const
@@ -81,61 +81,72 @@ class Map
     }
     inline Node get_north(const Node n) const
     {
-        debug_assert(0 <= n && n < size());
+        DEBUG_ASSERT(0 <= n && n < size());
         return n - width_;
     }
     inline Node get_south(const Node n) const
     {
-        debug_assert(0 <= n && n < size());
+        DEBUG_ASSERT(0 <= n && n < size());
         return n + width_;
     }
     inline Node get_west(const Node n) const
     {
-        debug_assert(0 <= n && n < size());
+        DEBUG_ASSERT(0 <= n && n < size());
         return n - 1;
     }
     inline Node get_east(const Node n) const
     {
-        debug_assert(0 <= n && n < size());
+        DEBUG_ASSERT(0 <= n && n < size());
         return n + 1;
     }
     inline Node get_wait(const Node n) const
     {
-        debug_assert(0 <= n && n < size());
+        DEBUG_ASSERT(0 <= n && n < size());
         return n;
     }
-    inline Size get_degree(const Node n) const
+    inline Size64 get_degree(const Node n) const
     {
-        return (*this)[get_north(n)] + (*this)[get_south(n)] + (*this)[get_west(n)] + (*this)[get_east(n)];
+        return (*this)[get_north(n)] + (*this)[get_south(n)] + (*this)[get_west(n)] +
+               (*this)[get_east(n)];
     }
     inline Direction get_direction(const Node n1, const Node n2) const
     {
         // Check.
-        debug_assert(n2 == get_north(n1) ||
-                     n2 == get_south(n1) ||
-                     n2 == get_west(n1) ||
-                     n2 == get_east(n1) ||
-                     n2 == get_wait(n1));
+        DEBUG_ASSERT(n2 == get_north(n1) || n2 == get_south(n1) || n2 == get_west(n1) ||
+                     n2 == get_east(n1) || n2 == get_wait(n1));
 
         // Return direction.
-        if      (n2 == get_north(n1)) { return Direction::NORTH; }
-        else if (n2 == get_south(n1)) { return Direction::SOUTH; }
-        else if (n2 == get_west(n1))  { return Direction::WEST; }
-        else if (n2 == get_east(n1))  { return Direction::EAST; }
-        else                          { return Direction::WAIT; }
+        if (n2 == get_north(n1))
+        {
+            return Direction::NORTH;
+        }
+        else if (n2 == get_south(n1))
+        {
+            return Direction::SOUTH;
+        }
+        else if (n2 == get_west(n1))
+        {
+            return Direction::WEST;
+        }
+        else if (n2 == get_east(n1))
+        {
+            return Direction::EAST;
+        }
+        else
+        {
+            return Direction::WAIT;
+        }
     }
     inline Node get_direction_n_offset(const Direction d) const
     {
-        return width_ * (static_cast<Node>(d == Direction::SOUTH) - static_cast<Node>(d == Direction::NORTH)) +
-                        (static_cast<Node>(d == Direction::EAST)  - static_cast<Node>(d == Direction::WEST));
+        return width_ * (static_cast<Node>(d == Direction::SOUTH) -
+                         static_cast<Node>(d == Direction::NORTH)) +
+               (static_cast<Node>(d == Direction::EAST) - static_cast<Node>(d == Direction::WEST));
     }
     inline Node get_destination(const Node n, const Direction d) const
     {
-        debug_assert(d == Direction::NORTH ||
-                     d == Direction::SOUTH ||
-                     d == Direction::EAST ||
-                     d == Direction::WEST ||
-                     d == Direction::WAIT);
+        DEBUG_ASSERT(d == Direction::NORTH || d == Direction::SOUTH || d == Direction::EAST ||
+                     d == Direction::WEST || d == Direction::WAIT);
         return n + get_direction_n_offset(d);
     }
     inline Node get_destination(const Edge e) const
@@ -158,31 +169,70 @@ class Map
     {
         switch (e.d)
         {
-            case (Direction::EAST): { return Edge{get_east(e.n), Direction::WEST}; }
-            case (Direction::SOUTH): { return Edge{get_south(e.n), Direction::NORTH}; }
-            default: { return e; }
+            case (Direction::EAST):
+            {
+                return Edge(get_east(e.n), Direction::WEST);
+            }
+            case (Direction::SOUTH):
+            {
+                return Edge(get_south(e.n), Direction::NORTH);
+            }
+            default:
+            {
+                return e;
+            }
         }
     }
-    inline Direction get_opposite_direction(const Direction d) const
+    static inline Direction get_opposite_direction(const Direction d)
     {
         switch (d)
         {
-            case (Direction::NORTH): { return Direction::SOUTH; }
-            case (Direction::SOUTH): { return Direction::NORTH; }
-            case (Direction::WEST): { return Direction::EAST; }
-            case (Direction::EAST): { return Direction::WEST; }
-            default: { return d; }
+            case (Direction::NORTH):
+            {
+                return Direction::SOUTH;
+            }
+            case (Direction::SOUTH):
+            {
+                return Direction::NORTH;
+            }
+            case (Direction::WEST):
+            {
+                return Direction::EAST;
+            }
+            case (Direction::EAST):
+            {
+                return Direction::WEST;
+            }
+            default:
+            {
+                return d;
+            }
         }
     }
     inline Edge get_opposite_edge(const Edge e) const
     {
         switch (e.d)
         {
-            case (Direction::NORTH): { return Edge{get_north(e.n), Direction::SOUTH}; }
-            case (Direction::SOUTH): { return Edge{get_south(e.n), Direction::NORTH}; }
-            case (Direction::WEST): { return Edge{get_west(e.n), Direction::EAST}; }
-            case (Direction::EAST): { return Edge{get_east(e.n), Direction::WEST}; }
-            default: { return e; }
+            case (Direction::NORTH):
+            {
+                return Edge(get_north(e.n), Direction::SOUTH);
+            }
+            case (Direction::SOUTH):
+            {
+                return Edge(get_south(e.n), Direction::NORTH);
+            }
+            case (Direction::WEST):
+            {
+                return Edge(get_west(e.n), Direction::EAST);
+            }
+            case (Direction::EAST):
+            {
+                return Edge(get_east(e.n), Direction::WEST);
+            }
+            default:
+            {
+                return e;
+            }
         }
     }
 

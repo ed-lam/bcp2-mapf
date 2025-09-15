@@ -5,12 +5,14 @@ Noncommercial License 1.0.0. A copy of this license can found in LICENSE.md.
 Author: Edward Lam <ed@ed-lam.com>
 */
 
+#ifdef USE_SHARED_TIME_INTERVAL_ASTAR_PRICER
+
 #pragma once
 
 #include "pricing/distance_heuristic.h"
 #include "pricing/once_off_penalties.h"
 #include "pricing/partial_pricing.h"
-#include "pricing/pricer.h"
+#include "pricing/pricer_base.h"
 #include "pricing/rectangle_penalties.h"
 #include "pricing/shared_intervals.h"
 #include "pricing/shared_time_interval_astar.h"
@@ -32,7 +34,7 @@ class SharedTimeIntervalAStarPricer : public PricerBase
     DistanceHeuristic distance_heuristic_;
 
     // Costs
-    Vector<Float> constants_;
+    Vector<Real64> constants_;
     Vector<Vector<NodeTime>> waypoints_;
     Vector<OnceOffPenalties> once_off_penalties_;
     Vector<RectanglePenalties> rectangle_penalties_;
@@ -54,14 +56,21 @@ class SharedTimeIntervalAStarPricer : public PricerBase
     ~SharedTimeIntervalAStarPricer() = default;
     SharedTimeIntervalAStarPricer(const SharedTimeIntervalAStarPricer&) noexcept = delete;
     SharedTimeIntervalAStarPricer(SharedTimeIntervalAStarPricer&&) noexcept = delete;
-    SharedTimeIntervalAStarPricer& operator=(const SharedTimeIntervalAStarPricer&) noexcept = delete;
+    SharedTimeIntervalAStarPricer& operator=(const SharedTimeIntervalAStarPricer&) noexcept =
+        delete;
     SharedTimeIntervalAStarPricer& operator=(SharedTimeIntervalAStarPricer&&) noexcept = delete;
 
     // Pricer type
-    constexpr static auto name() { return "Shared time-interval A*"; }
+    constexpr static auto name()
+    {
+        return "Shared time-interval A*";
+    }
 
     // Getters
-    auto& distance_heuristic() { return distance_heuristic_; }
+    auto& distance_heuristic()
+    {
+        return distance_heuristic_;
+    }
 
     // Set nodetime branching decisions and cost constant
     void add_waypoint(const Agent a, const NodeTime nt);
@@ -69,32 +78,34 @@ class SharedTimeIntervalAStarPricer : public PricerBase
 
     // Add nodetime costs
     void add_nodetime_penalty_all_agents(const NodeTime nt, const Cost cost);
-    void add_nodetime_penalty_all_except_one_agent(const Agent a, const NodeTime nt, const Cost cost);
+    void add_nodetime_penalty_all_except_one_agent(const Agent a, const NodeTime nt,
+                                                   const Cost cost);
     void add_nodetime_penalty_one_agent(const Agent a, const NodeTime nt, const Cost cost);
 
     // Add edgetime costs
     void add_edgetime_penalty_all_agents(const EdgeTime et, const Cost cost);
-    void add_edgetime_penalty_all_except_one_agent(const Agent a, const EdgeTime et, const Cost cost);
+    void add_edgetime_penalty_all_except_one_agent(const Agent a, const EdgeTime et,
+                                                   const Cost cost);
     void add_edgetime_penalty_one_agent(const Agent a, const EdgeTime et, const Cost cost);
 
     // Add end costs
     void add_end_penalty_all_agents(const Time earliest, const Time latest, const Cost cost);
-    void add_end_penalty_all_except_one_agent(const Agent a, const Time earliest, const Time latest, const Cost cost);
-    void add_end_penalty_one_agent(const Agent a, const Time earliest, const Time latest, const Cost cost);
+    void add_end_penalty_all_except_one_agent(const Agent a, const Time earliest, const Time latest,
+                                              const Cost cost);
+    void add_end_penalty_one_agent(const Agent a, const Time earliest, const Time latest,
+                                   const Cost cost);
 
     // Add costs for once-off penalties
-    template<OnceOffDirection d = OnceOffDirection::GEq>
-    void add_once_off_penalty_all_except_one_agent(const Agent a, const NodeTime nt, const Cost cost);
-    template<OnceOffDirection d = OnceOffDirection::GEq>
+    template <OnceOffDirection d = OnceOffDirection::GEq>
+    void add_once_off_penalty_all_except_one_agent(const Agent a, const NodeTime nt,
+                                                   const Cost cost);
+    template <OnceOffDirection d = OnceOffDirection::GEq>
     void add_once_off_penalty_one_agent(const Agent a, const NodeTime nt, const Cost cost);
 
     // Add costs for rectangle penalties
-    void add_rectangle_penalty_one_agent(const Agent a,
-                                         const EdgeTime first_entry,
-                                         const EdgeTime first_exit,
-                                         const Time length,
-                                         const Node n_increment,
-                                         const Cost cost);
+    void add_rectangle_penalty_one_agent(const Agent a, const EdgeTime first_entry,
+                                         const EdgeTime first_exit, const Time length,
+                                         const Node n_increment, const Cost cost);
 
     // Solve
     Cost solve();
@@ -108,12 +119,12 @@ class SharedTimeIntervalAStarPricer : public PricerBase
     {
         return Ranges::views::concat(
             Ranges::subrange(agent_intervals_.begin(), agent_intervals_.end()) |
-            Ranges::views::transform(
-                [](auto& pair) -> Pair<Agent, SharedIntervals&> { return {pair.first, *pair.second}; }
-            ),
-            Ranges::views::single(Pair<Agent, SharedIntervals&>(-1, shared_intervals_))
-        );
+                Ranges::views::transform([](auto& pair) -> Pair<Agent, SharedIntervals&>
+                                         { return {pair.first, *pair.second}; }),
+            Ranges::views::single(Pair<Agent, SharedIntervals&>(-1, shared_intervals_)));
     }
     const SharedIntervals& find_intervals_set(const Agent a) const;
     SharedIntervals& copy_intervals_set(const Agent a);
 };
+
+#endif

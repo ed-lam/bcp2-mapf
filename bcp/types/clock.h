@@ -7,8 +7,8 @@ Author: Edward Lam <ed@ed-lam.com>
 
 #pragma once
 
-#include "problem/debug.h"
 #include "types/basic_types.h"
+#include "types/debug.h"
 #include <ctime>
 #include <limits>
 
@@ -20,8 +20,14 @@ class Clock
 
       public:
         // Constructors and destructor
-        Timer(Clock& clock) : clock_(clock) {}
-        ~Timer() { clock_.accumulate_elapsed_time(); }
+        Timer(Clock& clock) :
+            clock_(clock)
+        {
+        }
+        ~Timer()
+        {
+            clock_.accumulate_elapsed_time();
+        }
         Timer(const Timer&) = delete;
         Timer(Timer&&) = delete;
         Timer& operator=(const Timer&) = delete;
@@ -29,9 +35,9 @@ class Clock
     };
     friend class Timer;
 
-    Float time_limit_ = std::numeric_limits<Float>::infinity();
+    Real64 time_limit_ = REAL_INF;
     std::clock_t start_time_ = null_time();
-    Float total_duration_ = 0.0;
+    Real64 total_duration_ = 0.0;
 
   public:
     // Constructors and destructor
@@ -43,27 +49,39 @@ class Clock
     Clock& operator=(Clock&&) = default;
 
     // Clock functions
-    auto start_timer(const Float time_limit = std::numeric_limits<Float>::infinity())
+    auto start_timer(const Real64 time_limit = REAL_INF)
     {
         time_limit_ = time_limit;
-        debug_assert(start_time_ == null_time());
+        DEBUG_ASSERT(start_time_ == null_time());
         start_time_ = std::clock();
         return Timer(*this);
     }
     auto elapsed_time() const
     {
-        debug_assert(start_time_ != null_time());
+        DEBUG_ASSERT(start_time_ != null_time());
         const auto current_time = std::clock();
-        const auto duration = static_cast<Float>(current_time - start_time_) / CLOCKS_PER_SEC;
+        const auto duration = static_cast<Real64>(current_time - start_time_) / CLOCKS_PER_SEC;
         return duration;
     }
-    auto time_remaining() const { return time_limit_ - elapsed_time(); }
-    auto timed_out() const { return time_remaining() < 0.0; }
-    auto total_duration() const { return total_duration_; }
+    auto time_remaining() const
+    {
+        return time_limit_ - elapsed_time();
+    }
+    auto timed_out() const
+    {
+        return time_remaining() < 0.0;
+    }
+    auto total_duration() const
+    {
+        return total_duration_;
+    }
 
   protected:
     // Internal functions
-    static std::clock_t null_time() { return static_cast<std::clock_t>(-1); }
+    static std::clock_t null_time()
+    {
+        return static_cast<std::clock_t>(-1);
+    }
     void accumulate_elapsed_time()
     {
         total_duration_ += elapsed_time();

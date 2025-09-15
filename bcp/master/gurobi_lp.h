@@ -70,12 +70,18 @@ class GurobiLP
     GurobiLP& operator=(GurobiLP&&) noexcept = default;
 
     // Getters
-    auto num_cols() const { return num_cols_; }
-    auto num_rows() const { return num_rows_; }
+    auto num_cols() const
+    {
+        return num_cols_;
+    }
+    auto num_rows() const
+    {
+        return num_rows_;
+    }
     Value col_lb(const ColumnIndex col) const;
     Value col_ub(const ColumnIndex col) const;
-    Float condition_number() const;
-    Float approx_condition_number() const;
+    Real64 condition_number() const;
+    Real64 approx_condition_number() const;
 #ifdef DEBUG
     String col_name(const ColumnIndex col) const;
     String row_name(const RowIndex row) const;
@@ -84,12 +90,10 @@ class GurobiLP
 #endif
 
     // Modifications
-    ColumnIndex add_column(const Span<RowIndex>& rows, const Span<Value>& coeffs, const Cost obj, const String& name);
-    RowIndex add_row(const Span<ColumnIndex>& cols,
-                     const Span<Value>& coeffs,
-                     const Sign sign,
-                     const Float rhs,
-                     const String& name);
+    ColumnIndex add_column(const Span<RowIndex>& rows, const Span<Value>& coeffs, const Cost obj,
+                           const String& name);
+    RowIndex add_row(const Span<ColumnIndex>& cols, const Span<Value>& coeffs, const Sign sign,
+                     const Real64 rhs, const String& name);
     void enable_columns();
     void disable_columns(const Span<ColumnIndex>& cols);
     void delete_columns(const Span<ColumnIndex>& cols);
@@ -102,15 +106,39 @@ class GurobiLP
 
     // Solve
     LPStatus solve(const LPAlgorithm algorithm = LPAlgorithm::DualSimplex,
-                   const Float time_limit = std::numeric_limits<Float>::infinity());
-    inline auto obj() const { return obj_; };
-    inline auto get_primal_sol(const ColumnIndex col) const { return primal_sol_[col]; }
-    inline auto get_dual_sol(const RowIndex row) const { return dual_sol_[row]; }
-    inline auto get_slack(const RowIndex row) const { return row_slack_[row]; }
-    inline auto get_col_basis(const ColumnIndex col) const { return col_basis_[col]; }
-    inline auto get_row_basis(const RowIndex row) const { return row_basis_[row]; }
-    inline auto col_is_basic(const ColumnIndex col) const { return get_col_basis(col) == COLUMN_IS_BASIC; }
-    inline auto row_is_basic(const RowIndex row) const { return get_row_basis(row) == ROW_IS_BASIC; }
+                   const Real64 time_limit = REAL_INF);
+    inline auto obj() const
+    {
+        return obj_;
+    };
+    inline auto get_primal_sol(const ColumnIndex col) const
+    {
+        return primal_sol_[col];
+    }
+    inline auto get_dual_sol(const RowIndex row) const
+    {
+        return dual_sol_[row];
+    }
+    inline auto get_slack(const RowIndex row) const
+    {
+        return row_slack_[row];
+    }
+    inline auto get_col_basis(const ColumnIndex col) const
+    {
+        return col_basis_[col];
+    }
+    inline auto get_row_basis(const RowIndex row) const
+    {
+        return row_basis_[row];
+    }
+    inline auto col_is_basic(const ColumnIndex col) const
+    {
+        return get_col_basis(col) == COLUMN_IS_BASIC;
+    }
+    inline auto row_is_basic(const RowIndex row) const
+    {
+        return get_row_basis(row) == ROW_IS_BASIC;
+    }
 
     // Debug
 #ifdef DEBUG

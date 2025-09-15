@@ -9,9 +9,9 @@ Author: Edward Lam <ed@ed-lam.com>
 
 #include "heuristics/random_rounding.h"
 #include "master/master.h"
-#include "problem/debug.h"
 #include "problem/map.h"
 #include "problem/problem.h"
+#include "types/debug.h"
 #include "types/float_compare.h"
 #include "types/tracy.h"
 #include <limits>
@@ -45,7 +45,7 @@ Pair<Cost, Vector<Variable*>> RandomRounding::execute()
 
     // Get all candidates.
     Vector<Vector<Variable*>> candidate_paths(A);
-    Vector<Vector<Float>> candidate_weights(A);
+    Vector<Vector<Real64>> candidate_weights(A);
     for (Agent a = 0; a < A; ++a)
         for (const auto& variable_ptr : master.agent_variable_ptrs(a))
         {
@@ -61,7 +61,7 @@ Pair<Cost, Vector<Variable*>> RandomRounding::execute()
     Pair<Cost, Vector<Variable*>> output;
     auto& [sol_cost, sol] = output;
     sol.resize(A);
-    for (Size iter = 0; iter < NUM_ITERATIONS; ++iter)
+    for (Size64 iter = 0; iter < NUM_ITERATIONS; ++iter)
     {
         // Reset data structures.
         sol_cost = 0.0;
@@ -75,8 +75,8 @@ Pair<Cost, Vector<Variable*>> RandomRounding::execute()
             target_blocked_[target] = TIME_MAX;
             target_crossed_[target] = -1;
         }
-        debug_assert(target_blocked_.size() == A);
-        debug_assert(target_crossed_.size() == A);
+        DEBUG_ASSERT(target_blocked_.size() == A);
+        DEBUG_ASSERT(target_crossed_.size() == A);
 
         // Randomly order the agents.
         std::shuffle(agents_.begin(), agents_.end(), rng_);
@@ -89,7 +89,7 @@ Pair<Cost, Vector<Variable*>> RandomRounding::execute()
             const auto index = dist(rng_);
 
             // Get the path.
-            debug_assert(index < candidate_paths[a].size());
+            DEBUG_ASSERT(index < candidate_paths[a].size());
             const auto& variable_ptr = candidate_paths[a][index];
             const auto& path = variable_ptr->path();
 
@@ -104,7 +104,8 @@ Pair<Cost, Vector<Variable*>> RandomRounding::execute()
                         goto NEXT_CANDIDATE_PATH_SET;
                     }
 
-                    if (auto it = target_blocked_.find(nt.n); it != target_blocked_.end() && it->second <= nt.t)
+                    if (auto it = target_blocked_.find(nt.n);
+                        it != target_blocked_.end() && it->second <= nt.t)
                     {
                         goto NEXT_CANDIDATE_PATH_SET;
                     }
@@ -144,22 +145,22 @@ Pair<Cost, Vector<Variable*>> RandomRounding::execute()
                 {
                     nt.n = path[nt.t].n;
                     auto& target_blocked_time = target_blocked_.at(nt.n);
-                    debug_assert(target_blocked_time == TIME_MAX);
+                    DEBUG_ASSERT(target_blocked_time == TIME_MAX);
                     target_blocked_time = nt.t;
                 }
             }
 
             // Store the path.
-            debug_assert(!sol[a]);
+            DEBUG_ASSERT(!sol[a]);
             sol[a] = variable_ptr;
             sol_cost += path.size() - 1;
         }
         ++num_feasible_;
         return output;
-        NEXT_CANDIDATE_PATH_SET:;
+    NEXT_CANDIDATE_PATH_SET:;
     }
 
     // No feasible solution was found.
-    sol_cost = INF;
+    sol_cost = COST_INF;
     return output;
 }

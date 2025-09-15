@@ -9,5 +9,5 @@ Author: Edward Lam <ed@ed-lam.com>
 
 #include <span>
 
-template<class T>
+template <class T>
 using Span = std::span<T>;

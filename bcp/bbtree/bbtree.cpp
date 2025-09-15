@@ -9,7 +9,7 @@ Author: Edward Lam <ed@ed-lam.com>
 
 #include "bbtree/bbtree.h"
 #include "bbtree/brancher.h"
-#include "problem/debug.h"
+#include "types/debug.h"
 #include "types/tracy.h"
 
 #define TRACY_COLOUR tracy::Color::ColorType::SpringGreen
@@ -27,7 +27,7 @@ BBTree::BBTree(const Instance& instance, Problem& problem) noexcept :
     auto root = std::make_shared<BBNode>();
     root->id = next_node_id_++;
     root->depth = 0;
-    root->lb = -INF;
+    root->lb = -COST_INF;
     root->brancher = nullptr;
 
     // Insert the root into the tree.
@@ -56,7 +56,7 @@ void BBTree::update_node_lb(const Cost lb)
 {
     ZoneScopedC(TRACY_COLOUR);
 
-    debug_assert(current_);
+    DEBUG_ASSERT(current_);
     current_->lb = std::max(current_->lb, lb);
 }
 
@@ -64,7 +64,7 @@ void BBTree::branch(Brancher* brancher, Decisions&& decisions)
 {
     ZoneScopedC(TRACY_COLOUR);
 
-    debug_assert(current_);
+    DEBUG_ASSERT(current_);
 
     // Create the first child.
     {
@@ -77,7 +77,7 @@ void BBTree::branch(Brancher* brancher, Decisions&& decisions)
         child->decision = std::move(decisions.first);
         child->variables = current_->variables;
         child->constraints = current_->constraints;
-        debugln("Created B&B node {} from first decision", child->id);
+        DEBUGLN("Created B&B node {} from first decision", child->id);
         node_sel_.push(std::move(child));
     }
 
@@ -92,7 +92,7 @@ void BBTree::branch(Brancher* brancher, Decisions&& decisions)
         child->decision = std::move(decisions.second);
         child->variables = current_->variables;
         child->constraints = current_->constraints;
-        debugln("Created B&B node {} from second decision", child->id);
+        DEBUGLN("Created B&B node {} from second decision", child->id);
         node_sel_.push(std::move(child));
     }
 }
@@ -101,14 +101,14 @@ Cost BBTree::lb() const
 {
     ZoneScopedC(TRACY_COLOUR);
 
-    return std::min(current_ ? current_->lb : INF, node_sel_.lb());
+    return std::min(current_ ? current_->lb : COST_INF, node_sel_.lb());
 }
 
 Vector<Pair<Brancher*, BrancherData*>> BBTree::all_decisions() const
 {
     ZoneScopedC(TRACY_COLOUR);
 
-    debug_assert(current_);
+    DEBUG_ASSERT(current_);
 
     Vector<Pair<Brancher*, BrancherData*>> decisions;
     decisions.reserve(current_->depth);
@@ -116,6 +116,6 @@ Vector<Pair<Brancher*, BrancherData*>> BBTree::all_decisions() const
     {
         decisions.push_back({node->brancher, node->decision.get()});
     }
-    debug_assert(decisions.size() == current_->depth);
+    DEBUG_ASSERT(decisions.size() == current_->depth);
     return decisions;
 }

@@ -9,9 +9,9 @@ Author: Edward Lam <ed@ed-lam.com>
 
 #include "pricing/interval.h"
 #include "problem/map.h"
+#include "types/arena.h"
 #include "types/hash_map.h"
 #include "types/map_types.h"
-#include "types/memory_pool.h"
 
 class IndependentIntervals
 {
@@ -19,7 +19,7 @@ class IndependentIntervals
     const Map& map_;
 
     // Intervals
-    MemoryPool interval_storage_;
+    Arena interval_storage_;
     Interval default_interval_;
     HashMap<Edge, Interval*> interval_set_;
     Vector<Cost> finish_time_h_;
@@ -40,7 +40,7 @@ class IndependentIntervals
     // Getters
     const Interval* get_intervals(const Node n, const Direction d) const
     {
-        debug_assert(n == -1 || map_[map_.get_destination(Edge{n, d})]);
+        DEBUG_ASSERT(n == -1 || map_[map_.get_destination(Edge{n, d})]);
         const Interval* intervals = &default_interval_;
         if (auto it = interval_set_.find(Edge{n, d}); it != interval_set_.end())
         {
@@ -48,16 +48,20 @@ class IndependentIntervals
         }
         return intervals;
     }
-    const Interval* get_end_intervals() const { return get_intervals(-1, static_cast<Direction>(4)); }
+    const Interval* get_end_intervals() const
+    {
+        return get_intervals(-1, static_cast<Direction>(4));
+    }
     Cost get_finish_time_h(const Time t) const
     {
-        debug_assert(!finish_time_h_.empty());
+        DEBUG_ASSERT(!finish_time_h_.empty());
         const auto index = std::min<Time>(finish_time_h_.size() - 1, t);
         return finish_time_h_[index];
     }
 
     // Insert intervals
-    void add_penalty(const Node n, const Direction d, const Time earliest, const Time latest, const Cost cost);
+    void add_penalty(const Node n, const Direction d, const Time earliest, const Time latest,
+                     const Cost cost);
     void add_end_penalty(const Time earliest, const Time latest, const Cost cost);
     void finalise();
 
@@ -66,8 +70,10 @@ class IndependentIntervals
 
   private:
     // Insert intervals
-    void insert_interval(const Node n, const Direction d, const Time start, const Time end, const Cost cost);
-    void insert_consecutive_intervals(const Node n, const Direction d, const Time start, const Time end);
+    void insert_interval(const Node n, const Direction d, const Time start, const Time end,
+                         const Cost cost);
+    void insert_consecutive_intervals(const Node n, const Direction d, const Time start,
+                                      const Time end);
 
     // Debug
 #ifdef DEBUG

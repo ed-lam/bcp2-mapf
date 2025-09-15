@@ -14,7 +14,7 @@ Author: Edward Lam <ed@ed-lam.com>
 
 class TargetConflictSeparator : public Separator
 {
-    struct TargetConstraint : public Constraint
+    struct ConstraintData
     {
         Agent finishing_agent;
         Agent crossing_agent;
@@ -22,7 +22,7 @@ class TargetConflictSeparator : public Separator
     };
     struct TargetConstraintCandidate
     {
-        Float lhs;
+        Real64 lhs;
         Agent finishing_agent;
         Agent crossing_agent;
         NodeTime nt;
@@ -30,7 +30,7 @@ class TargetConflictSeparator : public Separator
 
     // Helper data
     Vector<TargetConstraintCandidate> candidates_;
-    Matrix<UInt8> num_separated_;
+    Matrix<UInt16> num_separated_;
 
   public:
     // Constructors and destructor
@@ -38,19 +38,22 @@ class TargetConflictSeparator : public Separator
     TargetConflictSeparator(const Instance& instance, Problem& problem);
 
     // Separator type
-    constexpr static auto name() { return "Target"; }
+    constexpr static auto name()
+    {
+        return "Target";
+    }
 
     // Separate
     void separate();
 
     // Add dual solution to pricing costs
-    void add_pricing_costs(const Constraint& constraint, const Float dual);
+    static void apply_in_pricer(const Constraint& constraint, const Real64 dual, Pricer& pricer);
 
     // Add coefficient to a column
-    Float get_coeff(const Constraint& constraint, const Agent a, const Path& path);
+    static Real64 get_coeff(const Constraint& constraint, const Agent a, const Path& path);
 
   private:
-    static Float calculate_finishing_agent_coeff(const NodeTime nt, const Path& path);
-    static Float calculate_crossing_agent_coeff(const NodeTime nt, const Path& path);
+    static Real64 calculate_finishing_agent_coeff(const NodeTime nt, const Path& path);
+    static Real64 calculate_crossing_agent_coeff(const NodeTime nt, const Path& path);
     void create_row(const TargetConstraintCandidate& candidate);
 };

@@ -10,5 +10,5 @@ Author: Edward Lam <ed@ed-lam.com>
 #include "types/basic_types.h"
 #include <array>
 
-template<class T, Size S>
+template <class T, Size64 S>
 using Array = std::array<T, S>;

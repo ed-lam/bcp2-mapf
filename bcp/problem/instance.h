@@ -41,5 +41,8 @@ struct Instance
     ~Instance() = default;
 
     // Getters
-    inline Agent num_agents() const { return agents.size(); }
+    inline Agent num_agents() const
+    {
+        return agents.size();
+    }
 };

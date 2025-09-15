@@ -11,8 +11,8 @@ Author: Edward Lam <ed@ed-lam.com>
 #include "constraints/rectangle_clique_conflict.h"
 #include "constraints/rectangle_knapsack_conflict.h"
 #include "master/master.h"
-#include "problem/debug.h"
 #include "problem/problem.h"
+#include "types/debug.h"
 #include "types/float_compare.h"
 #include "types/hash_map.h"
 #include "types/tracy.h"
@@ -23,14 +23,14 @@ Author: Edward Lam <ed@ed-lam.com>
 struct Score
 {
     Agent a;
-    Float val;
+    Real64 val;
     Time shortest_path_length;
 };
 
 struct SuccessorDirection
 {
-    Bool has_move{false};
-    Bool has_wait{false};
+    Bool has_move = false;
+    Bool has_wait = false;
 };
 
 Decisions NodeTimeBrancher::branch()
@@ -43,7 +43,7 @@ Decisions NodeTimeBrancher::branch()
 
     // Calculate branching candidates.
     Vector<Time> path_lengths(A, -1);
-    Vector<Size> num_paths(A);
+    Vector<Size64> num_paths(A);
     HashMap<NodeTime, Pair<Vector<Score>, Vector<Score>>> candidates;
     HashMap<AgentTime, SuccessorDirection> successor_directions;
     for (Agent a = 0; a < A; ++a)
@@ -56,7 +56,7 @@ Decisions NodeTimeBrancher::branch()
                 // Store the path length.
                 const auto& path = variable.path();
                 const Time path_length = path.size();
-                debug_assert(path_lengths[a] < 0 || path_lengths[a] == path_length);
+                DEBUG_ASSERT(path_lengths[a] < 0 || path_lengths[a] == path_length);
                 path_lengths[a] = path_length;
 
                 // Increment the number of paths used by the agent.
@@ -70,7 +70,7 @@ Decisions NodeTimeBrancher::branch()
                     auto& scores = candidates[nt].first;
                     auto it = std::find_if(scores.begin(),
                                            scores.end(),
-                                           [a](const Score& score){ return score.a == a; });
+                                           [a](const Score& score) { return score.a == a; });
                     if (it == scores.end())
                     {
                         scores.push_back(Score{a, val, path_length});
@@ -79,7 +79,8 @@ Decisions NodeTimeBrancher::branch()
                     {
                         auto& score = *it;
                         score.val += val;
-                        score.shortest_path_length = std::min(score.shortest_path_length, path_length);
+                        score.shortest_path_length =
+                            std::min(score.shortest_path_length, path_length);
                     }
 
                     // Store whether the agent is waiting before this time.
@@ -90,33 +91,34 @@ Decisions NodeTimeBrancher::branch()
             }
         }
     }
-    release_assert(!candidates.empty(), "No candidates for nodetime branching");
+    ASSERT(!candidates.empty(), "No candidates for nodetime branching");
 
     // Get the solution.
     const auto& projection = problem_.projection();
 
-    // Determine the timesteps when an agent is within a rectangle. This is crude because the time interval encompasses
-    // the earlest and latest rectangle.
+    // Determine the timesteps when an agent is within a rectangle. This is crude because the time
+    // interval encompasses the earlest and latest rectangle.
     Vector<Pair<Time, Time>> rectangle_times(A, {TIME_MAX, 0});
 #ifdef USE_RECTANGLE_CLIQUE_CUTS
     for (const auto& constraint : master.subset_constraints())
     {
-        const auto& name = constraint.name();
+        const auto name = constraint.name();
         const auto slack = master.constraint_slack(constraint);
-        if (is_eq(slack, 0.0) && name.substr(0, 9) == "rectangle")
+        if (is_eq(slack, 0.0) && std::string_view(name).starts_with("rectangle"))
         {
             // Get the constraint data.
-            const auto& rectangle_constraint =
-                *static_cast<const RectangleCliqueConflictSeparator::RectangleCliqueConstraint*>(&constraint);
-            const auto a1 = rectangle_constraint.a1;
-            const auto a2 = rectangle_constraint.a2;
+            const auto& data =
+                *reinterpret_cast<const RectangleCliqueConflictSeparator::ConstraintData*>(
+                    constraint.data());
+            const auto a1 = data.a1;
+            const auto a2 = data.a2;
 
             // Get the earliest and latest time that an agent enters and exits a rectangle.
             {
-                const auto first_entry = rectangle_constraint.a1_first_entry;
-                const auto first_exit = rectangle_constraint.a1_first_exit;
-                const auto length = rectangle_constraint.a1_length;
-                const auto n_increment = rectangle_constraint.a1_n_increment;
+                const auto first_entry = data.a1_first_entry;
+                const auto first_exit = data.a1_first_exit;
+                const auto length = data.a1_length;
+                const auto n_increment = data.a1_n_increment;
                 const auto d = first_entry.d;
                 for (Time i = 0; i <= length; ++i)
                 {
@@ -142,13 +144,13 @@ Decisions NodeTimeBrancher::branch()
                         goto FOUND_A1_RECTANGLE;
                     }
                 }
-                FOUND_A1_RECTANGLE:;
+            FOUND_A1_RECTANGLE:;
             }
             {
-                const auto first_entry = rectangle_constraint.a2_first_entry;
-                const auto first_exit = rectangle_constraint.a2_first_exit;
-                const auto length = rectangle_constraint.a2_length;
-                const auto n_increment = rectangle_constraint.a2_n_increment;
+                const auto first_entry = data.a2_first_entry;
+                const auto first_exit = data.a2_first_exit;
+                const auto length = data.a2_length;
+                const auto n_increment = data.a2_n_increment;
                 const auto d = first_entry.d;
                 for (Time i = 0; i <= length; ++i)
                 {
@@ -174,40 +176,41 @@ Decisions NodeTimeBrancher::branch()
                         goto FOUND_A2_RECTANGLE;
                     }
                 }
-                FOUND_A2_RECTANGLE:;
+            FOUND_A2_RECTANGLE:;
             }
         }
     }
 #else
     for (const auto& constraint : master.subset_constraints())
     {
-        const auto& name = constraint.name();
+        const auto name = constraint.name();
         const auto slack = master.constraint_slack(constraint);
-        if (is_eq(slack, 0.0) && name.substr(0, 9) == "rectangle")
+        if (is_eq(slack, 0.0) && std::string_view(name).starts_with("rectangle"))
         {
             // Get the constraint data.
-            const auto& rectangle_constraint =
-                *static_cast<const RectangleKnapsackConflictSeparator::RectangleKnapsackConstraint*>(&constraint);
-            const auto a1 = rectangle_constraint.a1;
-            const auto a2 = rectangle_constraint.a2;
+            const auto& data =
+                *reinterpret_cast<const RectangleKnapsackConflictSeparator::ConstraintData*>(
+                    constraint.data());
+            const auto a1 = data.a1;
+            const auto a2 = data.a2;
 
             // Get the earliest and latest time that an agent enters and exits a rectangle.
-            for (const auto& et : rectangle_constraint.a1_ets())
+            for (const auto& et : data.a1_ets())
                 if (is_gt(projection.find_agent_move_edgetime(a1, et), 0.0))
                 {
                     rectangle_times[a1].first = std::min(rectangle_times[a1].first, et.t);
                     rectangle_times[a1].second = std::max(rectangle_times[a1].second, et.t);
                     goto FOUND_A1_RECTANGLE;
                 }
-            FOUND_A1_RECTANGLE:;
-            for (const auto& et : rectangle_constraint.a2_ets())
+        FOUND_A1_RECTANGLE:;
+            for (const auto& et : data.a2_ets())
                 if (is_gt(projection.find_agent_move_edgetime(a2, et), 0.0))
                 {
                     rectangle_times[a2].first = std::min(rectangle_times[a2].first, et.t);
                     rectangle_times[a2].second = std::max(rectangle_times[a2].second, et.t);
                     goto FOUND_A2_RECTANGLE;
                 }
-            FOUND_A2_RECTANGLE:;
+        FOUND_A2_RECTANGLE:;
         }
     }
 #endif
@@ -219,13 +222,14 @@ Decisions NodeTimeBrancher::branch()
         auto& scores = it->second;
         auto& integral_scores = scores.first;
         auto& fractional_scores = scores.second;
-        const auto nt_val = std::accumulate(integral_scores.begin(),
-                                            integral_scores.end(),
-                                            0.0,
-                                            [](const Float val, const Score& score) { return val + score.val; });
+        const auto nt_val =
+            std::accumulate(integral_scores.begin(),
+                            integral_scores.end(),
+                            0.0,
+                            [](const Real64 val, const Score& score) { return val + score.val; });
 
         // Move to list of fractional vertices.
-        debug_assert(integral_scores.size() >= 1);
+        DEBUG_ASSERT(integral_scores.size() >= 1);
         if (!is_integral(nt_val))
         {
             // Fractional.
@@ -252,20 +256,31 @@ Decisions NodeTimeBrancher::branch()
     Bool best_in_rectangle = false;
     Bool best_move_and_wait = false;
     Time best_shortest_path_length = TIME_MAX;
-    Size best_num_paths = 0;
+    Size64 best_num_paths = 0;
     NodeTime best_nt{0, TIME_MAX};
-    Float best_val = 0.0;
+    Real64 best_val = 0.0;
     Agent best_a = -1;
 
     // Prefer a nodetime that allows an agent to reach its target the earliest.
     for (const auto& [nt, scores] : candidates)
         for (const auto& [a, val, shortest_path_length] : scores.first)
         {
-            const auto in_rectangle = (rectangle_times[a].first <= nt.t && nt.t <= rectangle_times[a].second);
+            const auto in_rectangle =
+                (rectangle_times[a].first <= nt.t && nt.t <= rectangle_times[a].second);
             const auto successor_directions_t = successor_directions.at({a, nt.t - 1});
-            const auto move_and_wait = (successor_directions_t.has_move && successor_directions_t.has_wait);
-            if (std::tie(best_in_rectangle, best_move_and_wait, shortest_path_length,      best_num_paths, nt.t,      best_val) <
-                std::tie(in_rectangle,      move_and_wait,      best_shortest_path_length, num_paths[a],   best_nt.t, val))
+            const auto move_and_wait =
+                (successor_directions_t.has_move && successor_directions_t.has_wait);
+            if (std::tie(best_in_rectangle,
+                         best_move_and_wait,
+                         shortest_path_length,
+                         best_num_paths,
+                         nt.t,
+                         best_val) < std::tie(in_rectangle,
+                                              move_and_wait,
+                                              best_shortest_path_length,
+                                              num_paths[a],
+                                              best_nt.t,
+                                              val))
             {
                 best_in_rectangle = in_rectangle;
                 best_move_and_wait = move_and_wait;
@@ -278,7 +293,7 @@ Decisions NodeTimeBrancher::branch()
         }
     if (best_a >= 0)
     {
-        debugln("Nodetime brancher branching on agent {} and integer nodetime {} in B&B node {}",
+        DEBUGLN("Nodetime brancher branching on agent {} and integer nodetime {} in B&B node {}",
                 best_a,
                 format_nodetime(best_nt, instance_.map),
                 problem_.bbtree().current_id());
@@ -289,11 +304,22 @@ Decisions NodeTimeBrancher::branch()
     for (const auto& [nt, scores] : candidates)
         for (const auto& [a, val, shortest_path_length] : scores.second)
         {
-            const auto in_rectangle = (rectangle_times[a].first <= nt.t && nt.t <= rectangle_times[a].second);
+            const auto in_rectangle =
+                (rectangle_times[a].first <= nt.t && nt.t <= rectangle_times[a].second);
             const auto successor_directions_t = successor_directions.at({a, nt.t - 1});
-            const auto move_and_wait = (successor_directions_t.has_move && successor_directions_t.has_wait);
-            if (std::tie(best_in_rectangle, best_move_and_wait, shortest_path_length,      best_num_paths, nt.t,      best_val) <
-                std::tie(in_rectangle,      move_and_wait,      best_shortest_path_length, num_paths[a],   best_nt.t, val))
+            const auto move_and_wait =
+                (successor_directions_t.has_move && successor_directions_t.has_wait);
+            if (std::tie(best_in_rectangle,
+                         best_move_and_wait,
+                         shortest_path_length,
+                         best_num_paths,
+                         nt.t,
+                         best_val) < std::tie(in_rectangle,
+                                              move_and_wait,
+                                              best_shortest_path_length,
+                                              num_paths[a],
+                                              best_nt.t,
+                                              val))
             {
                 best_in_rectangle = in_rectangle;
                 best_move_and_wait = move_and_wait;
@@ -306,7 +332,7 @@ Decisions NodeTimeBrancher::branch()
         }
     if (best_a >= 0)
     {
-        debugln("Nodetime brancher branching on agent {} and fractional nodetime {} in B&B node {}",
+        DEBUGLN("Nodetime brancher branching on agent {} and fractional nodetime in B&B node {}",
                 best_a,
                 format_nodetime(best_nt, instance_.map),
                 problem_.bbtree().current_id());
@@ -314,10 +340,10 @@ Decisions NodeTimeBrancher::branch()
     }
 
     // Unreachable.
-    err("Failed to find a nodetime branching decision");
+    ERROR("Failed to find a nodetime branching decision");
 
-    // Store decision.
-    BRANCH:
+// Store decision.
+BRANCH:
     left_decision.a = best_a;
     left_decision.nt = best_nt;
     left_decision.dir = BranchDirection::Down;
@@ -339,7 +365,7 @@ void NodeTimeBrancher::add_pricing_costs(const BrancherData* const data)
     auto& pricer = problem_.pricer();
     if (dir == BranchDirection::Down)
     {
-        pricer.add_nodetime_penalty_one_agent(decision_a, nt, INF);
+        pricer.add_nodetime_penalty_one_agent(decision_a, nt, COST_INF);
     }
     else
     {
@@ -347,7 +373,7 @@ void NodeTimeBrancher::add_pricing_costs(const BrancherData* const data)
         pricer.add_waypoint(decision_a, nt);
 
         // Disable all other agents from visiting the nodetime.
-        pricer.add_nodetime_penalty_all_except_one_agent(decision_a, nt, INF);
+        pricer.add_nodetime_penalty_all_except_one_agent(decision_a, nt, COST_INF);
     }
 }
 
@@ -363,7 +389,8 @@ void NodeTimeBrancher::disable_vars(const BrancherData* const data)
     const auto& [decision_a, nt, dir] = *static_cast<const NodeTimeBrancherData*>(data);
 
     // Disable incompatible paths.
-    debugln("Nodetime brancher disabling paths incompatible with decision on agent {} {} {} in B&B node {}:",
+    DEBUGLN("Nodetime brancher disabling paths incompatible with decision on "
+            "agent {} {} {} in B&B node {}:",
             decision_a,
             (dir == BranchDirection::Up ? "requiring" : "forbidding"),
             format_nodetime(nt, instance_.map),
@@ -376,7 +403,8 @@ void NodeTimeBrancher::disable_vars(const BrancherData* const data)
         const auto path_visits_nt = (path[t].n == nt.n);
         if (path_visits_nt != static_cast<Bool>(dir))
         {
-            debugln("Agent {}, path {}", decision_a, format_path_with_time_spaced(path, instance_.map));
+            DEBUGLN(
+                "Agent {}, path {}", decision_a, format_path_with_time_spaced(path, instance_.map));
             master.disable_variable(variable);
         }
     }
@@ -387,20 +415,22 @@ void NodeTimeBrancher::disable_vars(const BrancherData* const data)
             {
                 for (const auto& variable : master.agent_variables(a))
                 {
-                    // Disable a path of a different agent if the branch direction requires the nodetime and
-                    // the other agent uses the nodetime.
+                    // Disable a path of a different agent if the branch direction requires the
+                    // nodetime and the other agent uses the nodetime.
                     const auto& path = variable.path();
                     const auto t = std::min<Time>(nt.t, path.size() - 1);
                     const auto path_visits_nt = (path[t].n == nt.n);
                     if (path_visits_nt)
                     {
-                        debugln("Agent {}, path {}", a, format_path_with_time_spaced(path, instance_.map));
+                        DEBUGLN("Agent {}, path {}",
+                                a,
+                                format_path_with_time_spaced(path, instance_.map));
                         master.disable_variable(variable);
                     }
                 }
             }
     }
-    debugln("");
+    DEBUGLN("");
 }
 
 void NodeTimeBrancher::print(const BrancherData* const data) const
@@ -409,7 +439,7 @@ void NodeTimeBrancher::print(const BrancherData* const data) const
     const auto& [a, nt, dir] = *static_cast<const NodeTimeBrancherData*>(data);
 
     // Print.
-    println("    Agent {} {} {}",
+    PRINTLN("    Agent {} {} {}",
             a,
             (dir == BranchDirection::Up ? "requiring" : "forbidding"),
             format_nodetime(nt, instance_.map));

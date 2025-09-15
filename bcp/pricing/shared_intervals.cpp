@@ -7,9 +7,9 @@ Author: Edward Lam <ed@ed-lam.com>
 
 // #define PRINT_DEBUG
 
-#include "output/formatting.h"
 #include "pricing/shared_intervals.h"
-#include "problem/debug.h"
+#include "output/formatting.h"
+#include "types/debug.h"
 #include "types/float_compare.h"
 #include "types/tracy.h"
 
@@ -44,20 +44,23 @@ void SharedIntervals::clear()
     interval_set_.clear();
 }
 
-void SharedIntervals::add_penalty(const Node n,
-                                  const Direction d,
-                                  const Time earliest,
-                                  const Time latest,
-                                  const Cost cost)
+void SharedIntervals::add_penalty(const Node n, const Direction d, const Time earliest,
+                                  const Time latest, const Cost cost)
 {
     ZoneScopedC(TRACY_COLOUR);
 
     // Print.
-    debugln("    Adding penalty at {} in the {} direction on interval [{},{}) of cost {} to agent {}",
-            format_node(n, map_), d, earliest, latest, cost, a_);
+    DEBUGLN(
+        "    Adding penalty at {} in the {} direction on interval [{},{}) of cost {} to agent {}",
+        format_node(n, map_),
+        d,
+        earliest,
+        latest,
+        cost,
+        a_);
 
     // Sum the penality.
-    debug_assert(is_ge(cost, 0.0));
+    DEBUG_ASSERT(is_ge(cost, 0.0));
     insert_interval(n, d, earliest, latest, cost);
 }
 
@@ -66,10 +69,14 @@ void SharedIntervals::add_end_penalty(const Time earliest, const Time latest, co
     ZoneScopedC(TRACY_COLOUR);
 
     // Print.
-    debugln("    Adding end penalty on interval [{},{}) of cost {} to agent {}", earliest, latest, cost, a_);
+    DEBUGLN("    Adding end penalty on interval [{},{}) of cost {} to agent {}",
+            earliest,
+            latest,
+            cost,
+            a_);
 
     // Sum the penality.
-    debug_assert(is_gt(cost, 0.0));
+    DEBUG_ASSERT(is_gt(cost, 0.0));
     insert_interval(-1, static_cast<Direction>(4), earliest, latest, cost);
 }
 
@@ -82,7 +89,9 @@ void SharedIntervals::finalise()
     Time last_end_interval = 0;
     {
         auto interval = end_intervals;
-        for (; interval->next; interval = interval->next) {}
+        for (; interval->next; interval = interval->next)
+        {
+        }
         last_end_interval = interval->start;
     }
     const auto size = last_end_interval + 1;
@@ -90,7 +99,7 @@ void SharedIntervals::finalise()
     // Calculate the finish time lower bounds.
     finish_time_h_.resize(size);
 #ifdef DEBUG
-    std::fill(finish_time_h_.begin(), finish_time_h_.end(), std::numeric_limits<Cost>::quiet_NaN());
+    std::fill(finish_time_h_.begin(), finish_time_h_.end(), COST_NAN);
 #endif
     auto interval = end_intervals;
     do
@@ -98,7 +107,7 @@ void SharedIntervals::finalise()
         const auto t_bound = std::min(interval->end, size);
         for (Time t = interval->start; t < t_bound; ++t)
         {
-            finish_time_h_[t] = INF;
+            finish_time_h_[t] = COST_INF;
             auto it = interval;
             do
             {
@@ -106,27 +115,28 @@ void SharedIntervals::finalise()
                 const auto arrival_cost = arrival_time - t;
                 const auto finish_cost = arrival_cost + it->cost;
                 finish_time_h_[t] = std::min(finish_time_h_[t], finish_cost);
-            }
-            while ((it = it->next));
+            } while ((it = it->next));
         }
-    }
-    while ((interval = interval->next));
+    } while ((interval = interval->next));
 #ifdef DEBUG
-    for (const auto x : finish_time_h_) { debug_assert(!std::isnan(x)); }
+    for (const auto x : finish_time_h_)
+    {
+        DEBUG_ASSERT(!std::isnan(x));
+    }
 #endif
 }
 
 Interval* SharedIntervals::duplicate_edge_intervals(const Node n, const Direction d)
 {
-    // Clone the default interval if not yet created. Otherwise clone the existing intervals if it belongs to the shared
-    // set.
+    // Clone the default interval if not yet created. Otherwise clone the existing intervals if it
+    // belongs to the shared set.
     auto [it, created] = interval_set_.try_emplace(Edge{n, d});
     auto& [intervals, intervals_are_shared] = it->second;
     if (created)
     {
         ZoneScopedNC("Create default interval", TRACY_COLOUR);
 
-        intervals = static_cast<Interval*>(interval_storage_.get_buffer<true, false>());
+        intervals = new (interval_storage_.get_buffer<true, false>()) Interval;
         intervals->start = 0;
         intervals->end = TIME_MAX;
         intervals->cost = 0.0;
@@ -135,13 +145,14 @@ Interval* SharedIntervals::duplicate_edge_intervals(const Node n, const Directio
     else if (intervals_are_shared && !is_shared_)
     {
         auto agent_interval = &intervals;
-        for (auto shared_interval = intervals; shared_interval; shared_interval = shared_interval->next)
+        for (auto shared_interval = intervals; shared_interval;
+             shared_interval = shared_interval->next)
         {
-            *agent_interval = static_cast<Interval*>(interval_storage_.get_buffer<true, false>());
+            *agent_interval = new (interval_storage_.get_buffer<true, false>()) Interval;
             std::memcpy(*agent_interval, shared_interval, sizeof(Interval));
             agent_interval = &(*agent_interval)->next;
         }
-        debug_assert(!*agent_interval);
+        DEBUG_ASSERT(!*agent_interval);
     }
     intervals_are_shared = is_shared_;
     return intervals;
@@ -152,20 +163,17 @@ Interval* SharedIntervals::duplicate_end_intervals()
     return duplicate_edge_intervals(-1, static_cast<Direction>(4));
 }
 
-void SharedIntervals::insert_interval(const Node n,
-                                      const Direction d,
-                                      const Time start,
-                                      const Time end,
-                                      const Cost cost)
+void SharedIntervals::insert_interval(const Node n, const Direction d, const Time start,
+                                      const Time end, const Cost cost)
 {
     ZoneScopedC(TRACY_COLOUR);
 
     // Check.
-    debug_assert(n == -1 || map_[n]);
-    debug_assert(0 <= start && start < end);
-    debug_assert(end <= TIME_MAX);
-    debug_assert(n >= 0 || d == 4);
-    debug_assert(n * 5 + d >= -1);
+    DEBUG_ASSERT(n == -1 || map_[n]);
+    DEBUG_ASSERT(0 <= start && start < end);
+    DEBUG_ASSERT(end <= TIME_MAX);
+    DEBUG_ASSERT(n >= 0 || d == 4);
+    DEBUG_ASSERT(n * 5 + d >= -1);
 
     // Duplicate the intervals on the edge for the agent if the intervals are shared.
     const auto intervals = duplicate_edge_intervals(n, d);
@@ -188,13 +196,13 @@ void SharedIntervals::insert_interval(const Node n,
         }
         if (!current || current->start > start)
         {
-            auto inserted = static_cast<Interval*>(interval_storage_.get_buffer<true, false>());
+            auto inserted = new (interval_storage_.get_buffer<true, false>()) Interval;
             inserted->start = start;
             inserted->end = current ? current->start : TIME_MAX;
             inserted->cost = prev->cost;
             inserted->next = current;
 
-            debug_assert(prev);
+            DEBUG_ASSERT(prev);
             prev->end = start;
             prev->next = inserted;
 
@@ -207,7 +215,7 @@ void SharedIntervals::insert_interval(const Node n,
     {
         ZoneScopedNC("Accumulate cost", TRACY_COLOUR);
 
-        debug_assert(current->start == start);
+        DEBUG_ASSERT(current->start == start);
         for (; current && current->end <= end; current = current->next)
         {
             current->cost += cost;
@@ -221,12 +229,12 @@ void SharedIntervals::insert_interval(const Node n,
 
         if (!current)
         {
-            debug_assert(prev->end == TIME_MAX);
-            debug_assert(!prev->next);
+            DEBUG_ASSERT(prev->end == TIME_MAX);
+            DEBUG_ASSERT(!prev->next);
         }
         if (current && current->start < end)
         {
-            auto inserted = static_cast<Interval*>(interval_storage_.get_buffer<true, false>());
+            auto inserted = new (interval_storage_.get_buffer<true, false>()) Interval;
             inserted->start = end;
             inserted->end = current->end;
             inserted->cost = current->cost;
@@ -269,16 +277,17 @@ void SharedIntervals::insert_interval(const Node n,
     }
 }
 
-void SharedIntervals::insert_consecutive_intervals(const Node n, const Direction d, const Time start, const Time end)
+void SharedIntervals::insert_consecutive_intervals(const Node n, const Direction d,
+                                                   const Time start, const Time end)
 {
     ZoneScopedC(TRACY_COLOUR);
 
     // Check.
-    debug_assert(n == -1 || map_[n]);
-    debug_assert(0 <= start && start < end);
-    debug_assert(end < TIME_MAX);
-    debug_assert(n >= 0 || d == 4);
-    debug_assert(n * 5 + d >= -1);
+    DEBUG_ASSERT(n == -1 || map_[n]);
+    DEBUG_ASSERT(0 <= start && start < end);
+    DEBUG_ASSERT(end < TIME_MAX);
+    DEBUG_ASSERT(n >= 0 || d == 4);
+    DEBUG_ASSERT(n * 5 + d >= -1);
 
     // Duplicate the intervals on the edge for the agent if the intervals are shared.
     const auto intervals = duplicate_edge_intervals(n, d);
@@ -300,13 +309,13 @@ void SharedIntervals::insert_consecutive_intervals(const Node n, const Direction
         }
         if (!current || current->start > start)
         {
-            auto inserted = static_cast<Interval*>(interval_storage_.get_buffer<true, false>());
+            auto inserted = new (interval_storage_.get_buffer<true, false>()) Interval;
             inserted->start = start;
             inserted->end = current ? current->start : TIME_MAX;
             inserted->cost = prev->cost;
             inserted->next = current;
 
-            debug_assert(prev);
+            DEBUG_ASSERT(prev);
             prev->end = start;
             prev->next = inserted;
 
@@ -320,11 +329,11 @@ void SharedIntervals::insert_consecutive_intervals(const Node n, const Direction
 
         for (Time t = start; t < end; ++t)
         {
-            debug_assert(current);
-            debug_assert(current->start == t);
+            DEBUG_ASSERT(current);
+            DEBUG_ASSERT(current->start == t);
             if (current->end > t + 1)
             {
-                auto inserted = static_cast<Interval*>(interval_storage_.get_buffer<true, false>());
+                auto inserted = new (interval_storage_.get_buffer<true, false>()) Interval;
                 inserted->start = t + 1;
                 inserted->end = current->end;
                 inserted->cost = current->cost;
@@ -333,7 +342,7 @@ void SharedIntervals::insert_consecutive_intervals(const Node n, const Direction
                 current->end = t + 1;
                 current->next = inserted;
             }
-            debug_assert(current->end == t + 1);
+            DEBUG_ASSERT(current->end == t + 1);
 
             prev = current;
             current = current->next;
@@ -350,14 +359,14 @@ void SharedIntervals::insert_consecutive_intervals(const Node n, const Direction
 void SharedIntervals::check_invariants(const Node n, const Direction d)
 {
     const Interval* it = get_intervals(n, d);
-    debug_assert(it->start == 0);
+    DEBUG_ASSERT(it->start == 0);
     while (it && it->next)
     {
-        debug_assert(it->end == it->next->start);
+        DEBUG_ASSERT(it->end == it->next->start);
         it = it->next;
     }
-    debug_assert(it->end == TIME_MAX);
-    debug_assert(!it->next);
+    DEBUG_ASSERT(it->end == TIME_MAX);
+    DEBUG_ASSERT(!it->next);
 }
 #endif
 
@@ -366,39 +375,54 @@ void SharedIntervals::print() const
     ZoneScopedC(TRACY_COLOUR);
 
     Node last_n = -2;
-    Size last_d = -1;
-    println("--------------------------------------------------------------------------------------------------------------------------------");
-    println("{:>16s}{:>16s}{:>16s}{:>16s}{:>16s}{:>16s}{:>16s}{:>16s}",
-            "From N", "To N", "From XY", "To XY", "Start", "End", "Penalty", "Shared");
+    Size64 last_d = -1;
+    PRINTLN("--------------------------------------------------------------------------------------"
+            "------------------------------------------");
+    PRINTLN("{:>16s}{:>16s}{:>16s}{:>16s}{:>16s}{:>16s}{:>16s}{:>16s}",
+            "From N",
+            "To N",
+            "From XY",
+            "To XY",
+            "Start",
+            "End",
+            "Penalty",
+            "Shared");
     for (Node n = -1; n < map_.size(); ++n)
-        for (Size d = (n < 0 ? 4 : 0); d <= Direction::WAIT; ++d)
+        for (Size64 d = (n < 0 ? 4 : 0); d <= Direction::WAIT; ++d)
             if (n == -1 || (map_[n] && map_[map_.get_destination(n, static_cast<Direction>(d))]))
             {
                 auto interval = get_intervals(n, static_cast<Direction>(d));
                 if (interval && (interval->next || interval->cost != 0.0))
                 {
-                    const auto dest = n >= 0 ? map_.get_destination(n, static_cast<Direction>(d)) : -1;
+                    const auto dest =
+                        n >= 0 ? map_.get_destination(n, static_cast<Direction>(d)) : -1;
 
                     Bool is_shared = true;
-                    if (auto it = interval_set_.find(Edge{n, static_cast<Direction>(d)}); it != interval_set_.end())
+                    if (auto it = interval_set_.find(Edge{n, static_cast<Direction>(d)});
+                        it != interval_set_.end())
                     {
                         is_shared = it->second.is_shared;
                     }
 
                     if (n != last_n || d != last_d)
                     {
-                        println("--------------------------------------------------------------------------------------------------------------------------------");
+                        PRINTLN("------------------------------------------------------------------"
+                                "--------------------------------------------------------------");
                     }
                     do
                     {
-                        println("{:>16d}{:>16d}{:>16s}{:>16s}{:>16d}{:>16d}{:>16.4f}{:>16}",
-                                n, dest,
-                                format_node(n, map_), format_node(dest, map_),
-                                interval->start, interval->end, interval->cost,
+                        PRINTLN("{:>16d}{:>16d}{:>16s}{:>16s}{:>16d}{:>16d}{:>16.4f}{:>16}",
+                                n,
+                                dest,
+                                format_node(n, map_),
+                                format_node(dest, map_),
+                                interval->start,
+                                interval->end,
+                                interval->cost,
                                 is_shared);
-                    }
-                    while ((interval = interval->next));
+                    } while ((interval = interval->next));
                 }
             }
-   println("--------------------------------------------------------------------------------------------------------------------------------");
+    PRINTLN("--------------------------------------------------------------------------------------"
+            "------------------------------------------");
 }

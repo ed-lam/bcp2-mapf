@@ -37,17 +37,25 @@ class BestFirstNodeSelection
     BestFirstNodeSelection(BestFirstNodeSelection&&) noexcept = default;
     BestFirstNodeSelection& operator=(const BestFirstNodeSelection&) noexcept = default;
     BestFirstNodeSelection& operator=(BestFirstNodeSelection&&) noexcept = default;
-    BestFirstNodeSelection(const Instance&, Problem&) noexcept {}
+    BestFirstNodeSelection(const Instance&, Problem&) noexcept
+    {
+    }
 
     // Tree functions
-    constexpr static Bool is_best_first_search() { return true; }
+    constexpr static Bool is_best_first_search()
+    {
+        return true;
+    }
     Bool empty() const;
-    Size size() const;
+    Size64 size() const;
     void clear();
     const SharedPtr<BBNode>& top() const;
     void pop();
     void push(SharedPtr<BBNode>&& node);
-    void push_root(SharedPtr<BBNode>&& node) { push(std::move(node)); }
+    void push_root(SharedPtr<BBNode>&& node)
+    {
+        push(std::move(node));
+    }
     Cost lb() const;
 };
 
@@ -64,17 +72,25 @@ class DepthFirstNodeSelection
     DepthFirstNodeSelection(DepthFirstNodeSelection&&) noexcept = default;
     DepthFirstNodeSelection& operator=(const DepthFirstNodeSelection&) noexcept = default;
     DepthFirstNodeSelection& operator=(DepthFirstNodeSelection&&) noexcept = default;
-    DepthFirstNodeSelection(const Instance&, Problem&) noexcept {}
+    DepthFirstNodeSelection(const Instance&, Problem&) noexcept
+    {
+    }
 
     // Tree functions
-    constexpr static Bool is_best_first_search() { return false; }
+    constexpr static Bool is_best_first_search()
+    {
+        return false;
+    }
     Bool empty() const;
-    Size size() const;
+    Size64 size() const;
     void clear();
     const SharedPtr<BBNode>& top() const;
     void pop();
     void push(SharedPtr<BBNode>&& node);
-    void push_root(SharedPtr<BBNode>&& node) { push(std::move(node)); }
+    void push_root(SharedPtr<BBNode>&& node)
+    {
+        push(std::move(node));
+    }
     Cost lb() const;
 };
 
@@ -102,12 +118,17 @@ class BestFirstDivingNodeSelection
     BestFirstDivingNodeSelection(BestFirstDivingNodeSelection&&) noexcept = default;
     BestFirstDivingNodeSelection& operator=(const BestFirstDivingNodeSelection&) noexcept = default;
     BestFirstDivingNodeSelection& operator=(BestFirstDivingNodeSelection&&) noexcept = default;
-    BestFirstDivingNodeSelection(const Instance&, Problem&) noexcept {}
+    BestFirstDivingNodeSelection(const Instance&, Problem&) noexcept
+    {
+    }
 
     // Tree functions
-    constexpr static Bool is_best_first_search() { return false; }
+    constexpr static Bool is_best_first_search()
+    {
+        return false;
+    }
     Bool empty() const;
-    Size size() const;
+    Size64 size() const;
     void clear();
     const SharedPtr<BBNode>& top() const;
     void pop();
@@ -130,22 +151,31 @@ class CappedBestFirstDivingNodeSelection
     mutable PriorityQueue bfs_;
     mutable Vector<SharedPtr<BBNode>> dfs_;
     mutable SharedPtr<BBNode> subtree_root_;
-    mutable Size subtree_size_;
+    mutable Size64 subtree_size_;
 
   public:
     // Constructors and destructor
     CappedBestFirstDivingNodeSelection() noexcept = delete;
     ~CappedBestFirstDivingNodeSelection() noexcept = default;
-    CappedBestFirstDivingNodeSelection(const CappedBestFirstDivingNodeSelection&) noexcept = default;
+    CappedBestFirstDivingNodeSelection(const CappedBestFirstDivingNodeSelection&) noexcept =
+        default;
     CappedBestFirstDivingNodeSelection(CappedBestFirstDivingNodeSelection&&) noexcept = default;
-    CappedBestFirstDivingNodeSelection& operator=(const CappedBestFirstDivingNodeSelection&) noexcept = default;
-    CappedBestFirstDivingNodeSelection& operator=(CappedBestFirstDivingNodeSelection&&) noexcept = default;
-    CappedBestFirstDivingNodeSelection(const Instance&, Problem&) noexcept : subtree_size_(0) {}
+    CappedBestFirstDivingNodeSelection& operator=(
+        const CappedBestFirstDivingNodeSelection&) noexcept = default;
+    CappedBestFirstDivingNodeSelection& operator=(CappedBestFirstDivingNodeSelection&&) noexcept =
+        default;
+    CappedBestFirstDivingNodeSelection(const Instance&, Problem&) noexcept :
+        subtree_size_(0)
+    {
+    }
 
     // Tree functions
-    constexpr static Bool is_best_first_search() { return false; }
+    constexpr static Bool is_best_first_search()
+    {
+        return false;
+    }
     Bool empty() const;
-    Size size() const;
+    Size64 size() const;
     void clear();
     const SharedPtr<BBNode>& top() const;
     void pop();
@@ -173,7 +203,7 @@ class BoundTargetedNodeSelection
     mutable PriorityQueue bfs_;
     mutable Vector<SharedPtr<BBNode>> dfs_;
     mutable SharedPtr<BBNode> subtree_root_;
-    mutable Size subtree_size_;
+    mutable Size64 subtree_size_;
 
   public:
     // Constructors and destructor
@@ -186,13 +216,19 @@ class BoundTargetedNodeSelection
     BoundTargetedNodeSelection(const Instance& instance, Problem& problem) noexcept;
 
     // Tree functions
-    constexpr static Bool is_best_first_search() { return false; }
+    constexpr static Bool is_best_first_search()
+    {
+        return false;
+    }
     Bool empty() const;
-    Size size() const;
+    Size64 size() const;
     void clear();
     const SharedPtr<BBNode>& top() const;
     void pop();
     void push(SharedPtr<BBNode>&& node);
-    void push_root(SharedPtr<BBNode>&& node) { push(std::move(node)); }
+    void push_root(SharedPtr<BBNode>&& node)
+    {
+        push(std::move(node));
+    }
     Cost lb() const;
 };

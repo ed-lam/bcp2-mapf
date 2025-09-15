@@ -24,7 +24,10 @@ class NodeTimeBrancher : public Brancher
     using Brancher::Brancher;
 
     // Bracner type
-    constexpr static auto name() { return "Node-time"; }
+    constexpr static auto name()
+    {
+        return "Node-time";
+    }
 
     // Branch
     Decisions branch();

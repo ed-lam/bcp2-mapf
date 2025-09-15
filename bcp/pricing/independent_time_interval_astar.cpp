@@ -5,11 +5,13 @@ Noncommercial License 1.0.0. A copy of this license can found in LICENSE.md.
 Author: Edward Lam <ed@ed-lam.com>
 */
 
+#ifdef USE_INDEPENDENT_TIME_INTERVAL_ASTAR_PRICER
+
 // #define PRINT_DEBUG
 
+#include "pricing/independent_time_interval_astar.h"
 #include "master/master.h"
 #include "output/formatting.h"
-#include "pricing/independent_time_interval_astar.h"
 #include "problem/problem.h"
 #include "types/bitset.h"
 #include "types/float_compare.h"
@@ -27,12 +29,10 @@ static UInt64 iter = 0;
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wunused-parameter"
 
-template<Bool feasible>
-IndependentTimeIntervalAStar<feasible>::IndependentTimeIntervalAStar(const Instance& instance,
-                                                                     Problem& problem,
-                                                                     DistanceHeuristic& distance_heuristic,
-                                                                     const Agent a,
-                                                                     Size& num_added) :
+template <Bool feasible>
+IndependentTimeIntervalAStar<feasible>::IndependentTimeIntervalAStar(
+    const Instance& instance, Problem& problem, DistanceHeuristic& distance_heuristic,
+    const Agent a, Size64& num_added) :
     instance_(instance),
     map_(instance_.map),
     problem_(problem),
@@ -62,11 +62,13 @@ IndependentTimeIntervalAStar<feasible>::IndependentTimeIntervalAStar(const Insta
     open_(),
     obj_()
 #ifdef USE_INDEPENDENT_TIME_INTERVAL_ASTAR_PRICER
-  , num_added_(num_added)
+    ,
+    num_added_(num_added)
 #endif
 
 #ifdef CHECK_USING_ASTAR
-  , astar_(instance, problem, distance_heuristic, a, num_added)
+    ,
+    astar_(instance, problem, distance_heuristic, a, num_added)
 #endif
 {
     ZoneScopedC(TRACY_COLOUR);
@@ -85,19 +87,19 @@ IndependentTimeIntervalAStar<feasible>::IndependentTimeIntervalAStar(const Insta
 
 #pragma GCC diagnostic pop
 
-template<Bool feasible>
+template <Bool feasible>
 Byte* IndependentTimeIntervalAStar<feasible>::get_once_off_bitset(Label* const label)
 {
     return label->bitset;
 }
 
-template<Bool feasible>
+template <Bool feasible>
 Byte* IndependentTimeIntervalAStar<feasible>::get_rectangle_bitset(Label* const label)
 {
     return label->bitset + once_off_bitset_size_;
 }
 
-template<Bool feasible>
+template <Bool feasible>
 IndependentTimeIntervalAStar<feasible>::~IndependentTimeIntervalAStar()
 {
     ZoneScopedC(TRACY_COLOUR);
@@ -106,7 +108,7 @@ IndependentTimeIntervalAStar<feasible>::~IndependentTimeIntervalAStar()
     std::free(closed_);
 }
 
-template<Bool feasible>
+template <Bool feasible>
 void IndependentTimeIntervalAStar<feasible>::reset()
 {
     ZoneScopedC(TRACY_COLOUR);
@@ -116,11 +118,12 @@ void IndependentTimeIntervalAStar<feasible>::reset()
     intervals_.clear();
     once_off_penalties_.clear();
     rectangle_penalties_.clear();
-    // earliest_target_time_ and latest_target_time_ are computed, whereas they are directly inputted in time-expanded A*
+    // earliest_target_time_ and latest_target_time_ are computed, whereas they are directly
+    // inputted in time-expanded A*
 }
 
-template<Bool feasible>
-template<Bool towards_end>
+template <Bool feasible>
+template <Bool towards_end>
 void IndependentTimeIntervalAStar<feasible>::generate_start()
 {
     // ZoneScopedC(TRACY_COLOUR);
@@ -129,20 +132,20 @@ void IndependentTimeIntervalAStar<feasible>::generate_start()
     const NodeTime next_nt = start_;
     const auto& next_n = next_nt.n;
     constexpr Time next_t = 0;
-    debug_assert(map_[next_n]);
+    DEBUG_ASSERT(map_[next_n]);
 
     // Calculate the distance to the next waypoint.
-    constexpr Size next_waypoint_index = 0;
+    constexpr Size64 next_waypoint_index = 0;
     const auto h_to_waypoint = h_to_waypoint_[next_n];
-    debug_assert(0 <= h_to_waypoint && h_to_waypoint < TIME_MAX);
+    DEBUG_ASSERT(0 <= h_to_waypoint && h_to_waypoint < TIME_MAX);
     const auto waypoint_t = waypoint_time_;
     const auto h_to_waypoint_time = std::max(h_to_waypoint, waypoint_t - next_t);
 
     // Calculate the distance to the target.
     const auto h_waypoint_to_target = towards_end ? 0 : h_waypoint_to_target_[next_waypoint_index];
-    debug_assert(0 <= h_waypoint_to_target && h_waypoint_to_target < TIME_MAX);
+    DEBUG_ASSERT(0 <= h_waypoint_to_target && h_waypoint_to_target < TIME_MAX);
     const auto h_to_target = h_to_waypoint_time + h_waypoint_to_target;
-    debug_assert(h_to_target >= earliest_target_time_ - next_t);
+    DEBUG_ASSERT(h_to_target >= earliest_target_time_ - next_t);
 
     // Calculate the earliest arrival time.
     const auto next_time_f = next_t + h_to_target;
@@ -154,8 +157,8 @@ void IndependentTimeIntervalAStar<feasible>::generate_start()
 #ifdef DEBUG
         if (verbose)
         {
-            println("        Time infeasible at start nt {}, n {}, xyt {}",
-                    next_nt.id,
+            PRINTLN("        Time infeasible at start nt {}, n {}, xyt {}",
+                    next_nt.id(),
                     next_n,
                     format_nodetime(next_nt, map_));
         }
@@ -166,7 +169,7 @@ void IndependentTimeIntervalAStar<feasible>::generate_start()
     }
 
     // Allocate memory for the label.
-    auto next = static_cast<Label*>(label_storage_.get_buffer<false, true>());
+    auto next = new (label_storage_.get_buffer<false, true>()) Label;
 
     // Calculate the g value.
     next->g = constant_;
@@ -176,12 +179,13 @@ void IndependentTimeIntervalAStar<feasible>::generate_start()
     {
         // Calculate the h value.
         const auto h_target_to_end = intervals_.get_finish_time_h(next_time_f);
-        // This h for feasible master problems is stronger than in LPA* which doesn't support varying h at the moment.
+        // This h for feasible master problems is stronger than in LPA* which doesn't support
+        // varying h at the moment.
         const auto next_h = h_to_target + h_target_to_end;
 
         // Update the f value.
         next->f = next->g + next_h;
-        debug_assert(next->f == next->g || is_ge(next->f, next->g));
+        DEBUG_ASSERT(next->f == next->g || is_ge(next->f, next->g));
     }
     else
     {
@@ -190,7 +194,14 @@ void IndependentTimeIntervalAStar<feasible>::generate_start()
 
     // Exit if cost infeasible.
     Cost cost_f;
-    if constexpr (feasible) { cost_f = next->f; } else { cost_f = next->g; }
+    if constexpr (feasible)
+    {
+        cost_f = next->f;
+    }
+    else
+    {
+        cost_f = next->g;
+    }
     if (is_ge(cost_f, 0.0))
     {
         // Print.
@@ -199,8 +210,9 @@ void IndependentTimeIntervalAStar<feasible>::generate_start()
         {
             if constexpr (feasible)
             {
-                println("        Cost infeasible at start nt {}, n {}, xyt {}, f {}, g {}, once-off {}, rectangle {}, reservations {}",
-                        next_nt.id,
+                PRINTLN("        Cost infeasible at start nt {}, n {}, xyt {}, f {}, g {}, "
+                        "once-off {}, rectangle {}, reservations {}",
+                        next_nt.id(),
                         next_n,
                         format_nodetime(next_nt, map_),
                         next->f,
@@ -211,8 +223,9 @@ void IndependentTimeIntervalAStar<feasible>::generate_start()
             }
             else
             {
-                println("        Cost infeasible at start nt {}, n {}, xyt {}, g {}, once-off {}, rectangle {}, reservations {}, time f {}, time g {}",
-                        next_nt.id,
+                PRINTLN("        Cost infeasible at start nt {}, n {}, xyt {}, g {}, once-off {}, "
+                        "rectangle {}, reservations {}, time f {}, time g {}",
+                        next_nt.id(),
                         next_n,
                         format_nodetime(next_nt, map_),
                         next->g,
@@ -239,8 +252,9 @@ void IndependentTimeIntervalAStar<feasible>::generate_start()
     {
         if constexpr (feasible)
         {
-            println("        Generated start at nt {}, n {}, xyt {}, f {}, g {}, once-off {}, rectangle {}, reservations {}",
-                    next_nt.id,
+            PRINTLN("        Generated start at nt {}, n {}, xyt {}, f {}, g {}, once-off {}, "
+                    "rectangle {}, reservations {}",
+                    next_nt.id(),
                     next_n,
                     format_nodetime(next_nt, map_),
                     next->f,
@@ -251,8 +265,9 @@ void IndependentTimeIntervalAStar<feasible>::generate_start()
         }
         else
         {
-            println("        Generated start at nt {}, n {}, xyt {}, g {}, once-off {}, rectangle {}, reservations {}, time f {}, time g {}",
-                    next_nt.id,
+            PRINTLN("        Generated start at nt {}, n {}, xyt {}, g {}, once-off {}, rectangle "
+                    "{}, reservations {}, time f {}, time g {}",
+                    next_nt.id(),
                     next_n,
                     format_nodetime(next_nt, map_),
                     next->g,
@@ -266,14 +281,15 @@ void IndependentTimeIntervalAStar<feasible>::generate_start()
 #endif
 }
 
-template<Bool feasible>
-template<Bool towards_end>
-void IndependentTimeIntervalAStar<feasible>::generate_nodetimes(const Node next_n, const Direction d, Label* current)
+template <Bool feasible>
+template <Bool towards_end>
+void IndependentTimeIntervalAStar<feasible>::generate_nodetimes(const Node next_n,
+                                                                const Direction d, Label* current)
 {
     // ZoneScopedC(TRACY_COLOUR);
 
     // Check.
-    debug_assert(map_[next_n]);
+    DEBUG_ASSERT(map_[next_n]);
 
     // Get the label data.
     const auto current_nt = current->nt;
@@ -281,12 +297,12 @@ void IndependentTimeIntervalAStar<feasible>::generate_nodetimes(const Node next_
     // Calculate the distance to the next waypoint.
     const auto next_waypoint_index = towards_end ? 0 : next_waypoint_index_;
     const auto h_to_waypoint = h_to_waypoint_[next_n];
-    debug_assert(0 <= h_to_waypoint && h_to_waypoint < TIME_MAX);
+    DEBUG_ASSERT(0 <= h_to_waypoint && h_to_waypoint < TIME_MAX);
     const auto waypoint_t = waypoint_time_;
 
     // Calculate the distance to the target.
     const auto h_waypoint_to_target = towards_end ? 0 : h_waypoint_to_target_[next_waypoint_index];
-    debug_assert(0 <= h_waypoint_to_target && h_waypoint_to_target < TIME_MAX);
+    DEBUG_ASSERT(0 <= h_waypoint_to_target && h_waypoint_to_target < TIME_MAX);
 
     // Skip intervals earlier than the current time.
     const Interval* move_interval;
@@ -324,12 +340,14 @@ void IndependentTimeIntervalAStar<feasible>::generate_nodetimes(const Node next_
             auto wait_interval = intervals_.get_intervals(current_nt.n, Direction::WAIT);
             do
             {
-                auto wait_duration = std::min(wait_interval->end, std::max(current_nt.t, move_interval->start)) -
+                auto wait_duration =
+                    std::min(wait_interval->end, std::max(current_nt.t, move_interval->start)) -
                     std::max(current_nt.t, wait_interval->start);
                 wait_duration = std::max(wait_duration, 0);
-                check_wait_cost += wait_duration == 0 ? 0.0 : wait_duration * (default_edge_cost + wait_interval->cost);
-            }
-            while ((wait_interval = wait_interval->next));
+                check_wait_cost += wait_duration == 0 ?
+                                       0.0 :
+                                       wait_duration * (default_edge_cost + wait_interval->cost);
+            } while ((wait_interval = wait_interval->next));
         }
 #endif
         {
@@ -337,23 +355,23 @@ void IndependentTimeIntervalAStar<feasible>::generate_nodetimes(const Node next_
             do
             {
                 const auto wait_start = wait_end;
-                debug_assert(wait_interval->start <= wait_start);
+                DEBUG_ASSERT(wait_interval->start <= wait_start);
                 wait_end = std::min(std::max(wait_end, move_interval->start), wait_interval->end);
                 const auto duration_in_wait_interval = wait_end - wait_start;
-                debug_assert(wait_start >= 0);
-                debug_assert(wait_end >= 0);
-                debug_assert(duration_in_wait_interval >= 0);
-                if (duration_in_wait_interval > 0 && wait_interval->cost == INF)
+                DEBUG_ASSERT(wait_start >= 0);
+                DEBUG_ASSERT(wait_end >= 0);
+                DEBUG_ASSERT(duration_in_wait_interval >= 0);
+                if (duration_in_wait_interval > 0 && wait_interval->cost == COST_INF)
                 {
                     return;
                 }
-                wait_cost += duration_in_wait_interval == 0 ?
-                             0.0 :
-                             duration_in_wait_interval * (default_edge_cost + wait_interval->cost);
-                debug_assert(!std::isnan(wait_cost));
-            }
-            while (wait_end >= wait_interval->end && (wait_interval = wait_interval->next));
-            debug_assert(is_eq(wait_cost, check_wait_cost));
+                wait_cost +=
+                    duration_in_wait_interval == 0 ?
+                        0.0 :
+                        duration_in_wait_interval * (default_edge_cost + wait_interval->cost);
+                DEBUG_ASSERT(!std::isnan(wait_cost));
+            } while (wait_end >= wait_interval->end && (wait_interval = wait_interval->next));
+            DEBUG_ASSERT(is_eq(wait_cost, check_wait_cost));
         }
 
         // Get the next nodetime.
@@ -363,18 +381,19 @@ void IndependentTimeIntervalAStar<feasible>::generate_nodetimes(const Node next_
         // Calculate the earliest arrival time.
         const auto h_to_waypoint_time = std::max(h_to_waypoint, waypoint_t - next_t);
         const auto h_to_target = h_to_waypoint_time + h_waypoint_to_target;
-        debug_assert(h_to_target >= earliest_target_time_ - next_t);
+        DEBUG_ASSERT(h_to_target >= earliest_target_time_ - next_t);
         const auto next_time_f = next_t + h_to_target;
 
         // Exit if time infeasible.
-        if ((!towards_end && next_t + h_to_waypoint > waypoint_t) || next_time_f > latest_target_time_)
+        if ((!towards_end && next_t + h_to_waypoint > waypoint_t) ||
+            next_time_f > latest_target_time_)
         {
             // Print.
 #ifdef DEBUG
             if (verbose)
             {
-                println("        Time infeasible at nt {}, n {}, xyt {}",
-                        next_nt.id,
+                PRINTLN("        Time infeasible at nt {}, n {}, xyt {}",
+                        next_nt.id(),
                         next_n,
                         format_nodetime(next_nt, map_));
             }
@@ -385,14 +404,14 @@ void IndependentTimeIntervalAStar<feasible>::generate_nodetimes(const Node next_
         }
 
         // Allocate memory for the label.
-        auto next = static_cast<Label*>(label_storage_.get_buffer<false, false>());
+        auto next = new (label_storage_.get_buffer<false, false>()) Label;
         std::memcpy(next, current, label_storage_.object_size());
 
         // Calculate the g value.
         next->g += wait_cost + default_edge_cost + move_interval->cost;
         {
             auto once_off_bitset = get_once_off_bitset(next);
-            for (Size index = 0; index < once_off_penalties_.size(); ++index)
+            for (Size64 index = 0; index < once_off_penalties_.size(); ++index)
                 if (!get_bitset(once_off_bitset, index))
                 {
                     // Get the penalty data.
@@ -400,8 +419,9 @@ void IndependentTimeIntervalAStar<feasible>::generate_nodetimes(const Node next_
 
                     // Accumulate the penalty if the nodetime is crossed.
                     const auto crossed = (d == OnceOffDirection::GEq) ?
-                        ((nt.n == current_nt.n && nt.t <= next_t - 1) || (nt.n == next_n && nt.t <= next_t)) :
-                        (nt.n == next_n && nt.t >= next_t);
+                                             ((nt.n == current_nt.n && nt.t <= next_t - 1) ||
+                                              (nt.n == next_n && nt.t <= next_t)) :
+                                             (nt.n == next_n && nt.t >= next_t);
                     if (crossed)
                     {
                         ++next->num_bitset_ones;
@@ -413,7 +433,7 @@ void IndependentTimeIntervalAStar<feasible>::generate_nodetimes(const Node next_
         if (d != Direction::WAIT)
         {
             auto rectangle_bitset = get_rectangle_bitset(next);
-            for (Size index = 0; index < rectangle_penalties_.size(); ++index)
+            for (Size64 index = 0; index < rectangle_penalties_.size(); ++index)
             {
                 // Get the penalty data.
                 const auto& [cost, first_ets, length, n_increment] = rectangle_penalties_[index];
@@ -436,19 +456,20 @@ void IndependentTimeIntervalAStar<feasible>::generate_nodetimes(const Node next_
                 }
             }
         }
-        debug_assert(is_ge(next->g, current->g));
+        DEBUG_ASSERT(is_ge(next->g, current->g));
 
         // Calculate the f value.
         if constexpr (feasible)
         {
             // Calculate the h value.
             const auto h_target_to_end = intervals_.get_finish_time_h(next_time_f);
-            // This h for feasible master problems is stronger than in LPA* which doesn't support varying h at the moment.
+            // This h for feasible master problems is stronger than in LPA* which doesn't support
+            // varying h at the moment.
             const auto next_h = h_to_target + h_target_to_end;
 
             // Update the f value.
             next->f = next->g + next_h;
-            debug_assert(next->f == next->g || is_ge(next->f, next->g));
+            DEBUG_ASSERT(next->f == next->g || is_ge(next->f, next->g));
         }
         else
         {
@@ -457,7 +478,14 @@ void IndependentTimeIntervalAStar<feasible>::generate_nodetimes(const Node next_
 
         // Exit if cost infeasible.
         Cost cost_f;
-        if constexpr (feasible) { cost_f = next->f; } else { cost_f = next->g; }
+        if constexpr (feasible)
+        {
+            cost_f = next->f;
+        }
+        else
+        {
+            cost_f = next->g;
+        }
         if (is_ge(cost_f, 0.0))
         {
             // Print.
@@ -466,8 +494,9 @@ void IndependentTimeIntervalAStar<feasible>::generate_nodetimes(const Node next_
             {
                 if constexpr (feasible)
                 {
-                    println("        Cost infeasible nt {}, n {}, xyt {}, f {}, g {}, once-off {}, rectangle {}, reservations {}",
-                            next_nt.id,
+                    PRINTLN("        Cost infeasible nt {}, n {}, xyt {}, f {}, g {}, once-off {}, "
+                            "rectangle {}, reservations {}",
+                            next_nt.id(),
                             next_n,
                             format_nodetime(next_nt, map_),
                             next->f,
@@ -478,8 +507,9 @@ void IndependentTimeIntervalAStar<feasible>::generate_nodetimes(const Node next_
                 }
                 else
                 {
-                    println("        Cost infeasible nt {}, n {}, xyt {}, g {}, once-off {}, rectangle {}, reservations {}, time f {}, time g {}",
-                            next_nt.id,
+                    PRINTLN("        Cost infeasible nt {}, n {}, xyt {}, g {}, once-off {}, "
+                            "rectangle {}, reservations {}, time f {}, time g {}",
+                            next_nt.id(),
                             next_n,
                             format_nodetime(next_nt, map_),
                             next->g,
@@ -525,9 +555,10 @@ void IndependentTimeIntervalAStar<feasible>::generate_nodetimes(const Node next_
         {
             if constexpr (feasible)
             {
-                println("        {} nt {}, n {}, xyt {}, f {}, g {}, once-off {}, rectangle {}, reservations {}",
+                PRINTLN("        {} nt {}, n {}, xyt {}, f {}, g {}, once-off {}, rectangle {}, "
+                        "reservations {}",
                         next ? "Generated" : "Dominated",
-                        next_nt.id,
+                        next_nt.id(),
                         next_n,
                         format_nodetime(next_nt, map_),
                         next_copy->f,
@@ -538,9 +569,10 @@ void IndependentTimeIntervalAStar<feasible>::generate_nodetimes(const Node next_
             }
             else
             {
-                println("        {} nt {}, n {}, xyt {}, g {}, once-off {}, rectangle {}, reservations {}, time f {}, time g {}",
+                PRINTLN("        {} nt {}, n {}, xyt {}, g {}, once-off {}, rectangle {}, "
+                        "reservations {}, time f {}, time g {}",
                         next ? "Generated" : "Dominated",
-                        next_nt.id,
+                        next_nt.id(),
                         next_n,
                         format_nodetime(next_nt, map_),
                         next_copy->g,
@@ -552,12 +584,11 @@ void IndependentTimeIntervalAStar<feasible>::generate_nodetimes(const Node next_
             }
         }
 #endif
-    }
-    while ((move_interval = move_interval->next));
+    } while ((move_interval = move_interval->next));
 }
 
-template<Bool feasible>
-template<Bool towards_end>
+template <Bool feasible>
+template <Bool towards_end>
 void IndependentTimeIntervalAStar<feasible>::generate_waypoint(Label* current)
 {
     // ZoneScopedC(TRACY_COLOUR);
@@ -567,17 +598,17 @@ void IndependentTimeIntervalAStar<feasible>::generate_waypoint(Label* current)
 
     // Get the label data.
     const auto current_nt = current->nt;
-    debug_assert(current_nt.n == waypoints_[next_waypoint_index_].n);
+    DEBUG_ASSERT(current_nt.n == waypoints_[next_waypoint_index_].n);
     const auto next_n = current_nt.n;
 
     // Calculate the distance to the next waypoint and target.
     const auto next_waypoint_index = towards_end ? 0 : next_waypoint_index_;
-    debug_assert(h_to_waypoint_[next_n] == 0);
+    DEBUG_ASSERT(h_to_waypoint_[next_n] == 0);
     const auto waypoint_t = waypoint_time_;
 
     // Calculate the distance to the target.
     const auto h_waypoint_to_target = towards_end ? 0 : h_waypoint_to_target_[next_waypoint_index];
-    debug_assert(0 <= h_waypoint_to_target && h_waypoint_to_target < TIME_MAX);
+    DEBUG_ASSERT(0 <= h_waypoint_to_target && h_waypoint_to_target < TIME_MAX);
 
     // Skip intervals earlier than the current time.
     const Interval* wait_interval;
@@ -604,12 +635,14 @@ void IndependentTimeIntervalAStar<feasible>::generate_waypoint(Label* current)
             auto wait_interval = intervals_.get_intervals(next_n, Direction::WAIT);
             do
             {
-                auto wait_duration = std::min(wait_interval->end, std::max(current_nt.t, waypoint_t)) -
+                auto wait_duration =
+                    std::min(wait_interval->end, std::max(current_nt.t, waypoint_t)) -
                     std::max(current_nt.t, wait_interval->start);
                 wait_duration = std::max(wait_duration, 0);
-                check_wait_cost += wait_duration == 0 ? 0.0 : wait_duration * (default_edge_cost + wait_interval->cost);
-            }
-            while ((wait_interval = wait_interval->next));
+                check_wait_cost += wait_duration == 0 ?
+                                       0.0 :
+                                       wait_duration * (default_edge_cost + wait_interval->cost);
+            } while ((wait_interval = wait_interval->next));
         }
 #endif
         {
@@ -617,34 +650,34 @@ void IndependentTimeIntervalAStar<feasible>::generate_waypoint(Label* current)
             do
             {
                 const auto wait_start = wait_end;
-                debug_assert(wait_interval->start <= wait_start);
+                DEBUG_ASSERT(wait_interval->start <= wait_start);
                 wait_end = std::min(std::max(wait_end, waypoint_t), wait_interval->end);
                 const auto duration_in_wait_interval = wait_end - wait_start;
-                debug_assert(wait_start >= 0);
-                debug_assert(wait_end >= 0);
-                debug_assert(duration_in_wait_interval >= 0);
-                if (duration_in_wait_interval > 0 && wait_interval->cost == INF)
+                DEBUG_ASSERT(wait_start >= 0);
+                DEBUG_ASSERT(wait_end >= 0);
+                DEBUG_ASSERT(duration_in_wait_interval >= 0);
+                if (duration_in_wait_interval > 0 && wait_interval->cost == COST_INF)
                 {
                     return;
                 }
-                wait_cost += duration_in_wait_interval == 0 ?
-                             0.0 :
-                             duration_in_wait_interval * (default_edge_cost + wait_interval->cost);
-                debug_assert(!std::isnan(wait_cost));
-            }
-            while (wait_end >= wait_interval->end && (wait_interval = wait_interval->next));
-            debug_assert(is_eq(wait_cost, check_wait_cost));
+                wait_cost +=
+                    duration_in_wait_interval == 0 ?
+                        0.0 :
+                        duration_in_wait_interval * (default_edge_cost + wait_interval->cost);
+                DEBUG_ASSERT(!std::isnan(wait_cost));
+            } while (wait_end >= wait_interval->end && (wait_interval = wait_interval->next));
+            DEBUG_ASSERT(is_eq(wait_cost, check_wait_cost));
         }
 
         // Get the next nodetime.
         const auto next_t = wait_end;
-        debug_assert(next_t == waypoint_t);
+        DEBUG_ASSERT(next_t == waypoint_t);
         const NodeTime next_nt{next_n, next_t};
 
         // Calculate the earliest arrival time.
         constexpr auto h_to_waypoint_time = 0;
         const auto h_to_target = h_to_waypoint_time + h_waypoint_to_target;
-        debug_assert(h_to_target >= earliest_target_time_ - next_t);
+        DEBUG_ASSERT(h_to_target >= earliest_target_time_ - next_t);
         const auto next_time_f = next_t + h_to_target;
 
         // Exit if time infeasible.
@@ -654,8 +687,8 @@ void IndependentTimeIntervalAStar<feasible>::generate_waypoint(Label* current)
 #ifdef DEBUG
             if (verbose)
             {
-                println("        Time infeasible at nt {}, n {}, xyt {}",
-                        next_nt.id,
+                PRINTLN("        Time infeasible at nt {}, n {}, xyt {}",
+                        next_nt.id(),
                         next_n,
                         format_nodetime(next_nt, map_));
             }
@@ -666,14 +699,14 @@ void IndependentTimeIntervalAStar<feasible>::generate_waypoint(Label* current)
         }
 
         // Allocate memory for the label.
-        auto next = static_cast<Label*>(label_storage_.get_buffer<false, false>());
+        auto next = new (label_storage_.get_buffer<false, false>()) Label;
         std::memcpy(next, current, label_storage_.object_size());
 
         // Calculate the g value.
         next->g += wait_cost;
         {
             auto once_off_bitset = get_once_off_bitset(next);
-            for (Size index = 0; index < once_off_penalties_.size(); ++index)
+            for (Size64 index = 0; index < once_off_penalties_.size(); ++index)
                 if (!get_bitset(once_off_bitset, index))
                 {
                     // Get the penalty data.
@@ -681,8 +714,8 @@ void IndependentTimeIntervalAStar<feasible>::generate_waypoint(Label* current)
 
                     // Accumulate the penalty.
                     const auto crossed = (d == OnceOffDirection::GEq) ?
-                        (nt.n == next_n && nt.t <= next_t) :
-                        (nt.n == next_n && nt.t >= next_t);
+                                             (nt.n == next_n && nt.t <= next_t) :
+                                             (nt.n == next_n && nt.t >= next_t);
                     if (crossed)
                     {
                         ++next->num_bitset_ones;
@@ -691,19 +724,20 @@ void IndependentTimeIntervalAStar<feasible>::generate_waypoint(Label* current)
                     }
                 }
         }
-        debug_assert(is_ge(next->g, current->g));
+        DEBUG_ASSERT(is_ge(next->g, current->g));
 
         // Calculate the f value.
         if constexpr (feasible)
         {
             // Calculate the h value.
             const auto h_target_to_end = intervals_.get_finish_time_h(next_time_f);
-            // This h for feasible master problems is stronger than in LPA* which doesn't support varying h at the moment.
+            // This h for feasible master problems is stronger than in LPA* which doesn't support
+            // varying h at the moment.
             const auto next_h = h_to_target + h_target_to_end;
 
             // Update the f value.
             next->f = next->g + next_h;
-            debug_assert(next->f == next->g || is_ge(next->f, next->g));
+            DEBUG_ASSERT(next->f == next->g || is_ge(next->f, next->g));
         }
         else
         {
@@ -712,7 +746,14 @@ void IndependentTimeIntervalAStar<feasible>::generate_waypoint(Label* current)
 
         // Exit if cost infeasible.
         Cost cost_f;
-        if constexpr (feasible) { cost_f = next->f; } else { cost_f = next->g; }
+        if constexpr (feasible)
+        {
+            cost_f = next->f;
+        }
+        else
+        {
+            cost_f = next->g;
+        }
         if (is_ge(cost_f, 0.0))
         {
             // Print.
@@ -721,8 +762,9 @@ void IndependentTimeIntervalAStar<feasible>::generate_waypoint(Label* current)
             {
                 if constexpr (feasible)
                 {
-                    println("        Cost infeasible nt {}, n {}, xyt {}, f {}, g {}, once-off {}, rectangle {}, reservations {}",
-                            next_nt.id,
+                    PRINTLN("        Cost infeasible nt {}, n {}, xyt {}, f {}, g {}, once-off {}, "
+                            "rectangle {}, reservations {}",
+                            next_nt.id(),
                             next_n,
                             format_nodetime(next_nt, map_),
                             next->f,
@@ -733,8 +775,9 @@ void IndependentTimeIntervalAStar<feasible>::generate_waypoint(Label* current)
                 }
                 else
                 {
-                    println("        Cost infeasible nt {}, n {}, xyt {}, g {}, once-off {}, rectangle {}, reservations {}, time f {}, time g {}",
-                            next_nt.id,
+                    PRINTLN("        Cost infeasible nt {}, n {}, xyt {}, g {}, once-off {}, "
+                            "rectangle {}, reservations {}, time f {}, time g {}",
+                            next_nt.id(),
                             next_n,
                             format_nodetime(next_nt, map_),
                             next->g,
@@ -779,9 +822,10 @@ void IndependentTimeIntervalAStar<feasible>::generate_waypoint(Label* current)
         {
             if constexpr (feasible)
             {
-                println("        {} nt {}, n {}, xyt {}, f {}, g {}, once-off {}, rectangle {}, reservations {}",
+                PRINTLN("        {} nt {}, n {}, xyt {}, f {}, g {}, once-off {}, rectangle {}, "
+                        "reservations {}",
                         next ? "Generated" : "Dominated",
-                        next_nt.id,
+                        next_nt.id(),
                         next_n,
                         format_nodetime(next_nt, map_),
                         next_copy->f,
@@ -792,9 +836,10 @@ void IndependentTimeIntervalAStar<feasible>::generate_waypoint(Label* current)
             }
             else
             {
-                println("        {} nt {}, n {}, xyt {}, g {}, once-off {}, rectangle {}, reservations {}, time f {}, time g {}",
+                PRINTLN("        {} nt {}, n {}, xyt {}, g {}, once-off {}, rectangle {}, "
+                        "reservations {}, time f {}, time g {}",
                         next ? "Generated" : "Dominated",
-                        next_nt.id,
+                        next_nt.id(),
                         next_n,
                         format_nodetime(next_nt, map_),
                         next_copy->g,
@@ -809,7 +854,7 @@ void IndependentTimeIntervalAStar<feasible>::generate_waypoint(Label* current)
     }
 }
 
-template<Bool feasible>
+template <Bool feasible>
 void IndependentTimeIntervalAStar<feasible>::generate_end(Label* current)
 {
     // ZoneScopedC(TRACY_COLOUR);
@@ -853,12 +898,14 @@ void IndependentTimeIntervalAStar<feasible>::generate_end(Label* current)
             auto wait_interval = intervals_.get_intervals(target_, Direction::WAIT);
             do
             {
-                auto wait_duration = std::min(wait_interval->end, std::max(current_nt.t, move_interval->start)) -
+                auto wait_duration =
+                    std::min(wait_interval->end, std::max(current_nt.t, move_interval->start)) -
                     std::max(current_nt.t, wait_interval->start);
                 wait_duration = std::max(wait_duration, 0);
-                check_wait_cost += wait_duration == 0 ? 0.0 : wait_duration * (default_edge_cost + wait_interval->cost);
-            }
-            while ((wait_interval = wait_interval->next));
+                check_wait_cost += wait_duration == 0 ?
+                                       0.0 :
+                                       wait_duration * (default_edge_cost + wait_interval->cost);
+            } while ((wait_interval = wait_interval->next));
         }
 #endif
         {
@@ -866,23 +913,23 @@ void IndependentTimeIntervalAStar<feasible>::generate_end(Label* current)
             do
             {
                 const auto wait_start = wait_end;
-                debug_assert(wait_interval->start <= wait_start);
+                DEBUG_ASSERT(wait_interval->start <= wait_start);
                 wait_end = std::min(std::max(wait_end, move_interval->start), wait_interval->end);
                 const auto duration_in_wait_interval = wait_end - wait_start;
-                debug_assert(wait_start >= 0);
-                debug_assert(wait_end >= 0);
-                debug_assert(duration_in_wait_interval >= 0);
-                if (duration_in_wait_interval > 0 && wait_interval->cost == INF)
+                DEBUG_ASSERT(wait_start >= 0);
+                DEBUG_ASSERT(wait_end >= 0);
+                DEBUG_ASSERT(duration_in_wait_interval >= 0);
+                if (duration_in_wait_interval > 0 && wait_interval->cost == COST_INF)
                 {
                     return;
                 }
-                wait_cost += duration_in_wait_interval == 0 ?
-                             0.0 :
-                             duration_in_wait_interval * (default_edge_cost + wait_interval->cost);
-                debug_assert(!std::isnan(wait_cost));
-            }
-            while (wait_end >= wait_interval->end && (wait_interval = wait_interval->next));
-            debug_assert(is_eq(wait_cost, check_wait_cost));
+                wait_cost +=
+                    duration_in_wait_interval == 0 ?
+                        0.0 :
+                        duration_in_wait_interval * (default_edge_cost + wait_interval->cost);
+                DEBUG_ASSERT(!std::isnan(wait_cost));
+            } while (wait_end >= wait_interval->end && (wait_interval = wait_interval->next));
+            DEBUG_ASSERT(is_eq(wait_cost, check_wait_cost));
         }
 
         // Get the next nodetime.
@@ -896,8 +943,8 @@ void IndependentTimeIntervalAStar<feasible>::generate_end(Label* current)
 #ifdef DEBUG
             if (verbose)
             {
-                println("        Time infeasible at nt {}, n {}, xyt {}",
-                        next_nt.id,
+                PRINTLN("        Time infeasible at nt {}, n {}, xyt {}",
+                        next_nt.id(),
                         next_nt.n,
                         format_nodetime(next_nt, map_));
             }
@@ -908,12 +955,12 @@ void IndependentTimeIntervalAStar<feasible>::generate_end(Label* current)
         }
 
         // Allocate memory for the label.
-        auto next = static_cast<Label*>(label_storage_.get_buffer<false, false>());
+        auto next = new (label_storage_.get_buffer<false, false>()) Label;
         std::memcpy(next, current, label_storage_.object_size());
 
         // Calculate the g value.
         next->g += wait_cost + move_interval->cost;
-        debug_assert(is_ge(next->g, current->g));
+        DEBUG_ASSERT(is_ge(next->g, current->g));
 
         // Exit if cost infeasible.
         if (is_ge(next->g, 0.0))
@@ -924,8 +971,9 @@ void IndependentTimeIntervalAStar<feasible>::generate_end(Label* current)
             {
                 if constexpr (feasible)
                 {
-                    println("        Cost infeasible at end nt {}, n {}, xyt {}, g {}, once-off {}, rectangle {}",
-                            next_nt.id,
+                    PRINTLN("        Cost infeasible at end nt {}, n {}, xyt {}, g {}, once-off "
+                            "{}, rectangle {}",
+                            next_nt.id(),
                             next_nt.n,
                             format_nodetime(next_nt, map_),
                             next->g,
@@ -934,8 +982,9 @@ void IndependentTimeIntervalAStar<feasible>::generate_end(Label* current)
                 }
                 else
                 {
-                    println("        Cost infeasible at end nt {}, n {}, xyt {}, g {}, once-off {}, rectangle {}, time g {}",
-                            next_nt.id,
+                    PRINTLN("        Cost infeasible at end nt {}, n {}, xyt {}, g {}, once-off "
+                            "{}, rectangle {}, time g {}",
+                            next_nt.id(),
                             next_nt.n,
                             format_nodetime(next_nt, map_),
                             next->g,
@@ -949,7 +998,7 @@ void IndependentTimeIntervalAStar<feasible>::generate_end(Label* current)
             // Proceed to the next interval.
             continue;
         }
-        debug_assert(next_t >= earliest_target_time_);
+        DEBUG_ASSERT(next_t >= earliest_target_time_);
 
         // Calculate the f value.
         if constexpr (feasible)
@@ -975,20 +1024,22 @@ void IndependentTimeIntervalAStar<feasible>::generate_end(Label* current)
         {
             if constexpr (feasible)
             {
-                println("        {} at end nt {}, n {}, xyt {}, g {}, once-off {}, rectangle {}",
-                        next ? "Generated" : "Dominated",
-                        next_nt.id,
-                        next_nt.n,
-                        format_nodetime(next_nt, map_),
-                        next_copy->g,
-                        format_bitset(get_once_off_bitset(next_copy), once_off_penalties_.size()),
-                        format_bitset(get_rectangle_bitset(next_copy), rectangle_penalties_.size()));
+                PRINTLN(
+                    "        {} at end nt {}, n {}, xyt {}, g {}, once-off {}, rectangle {}",
+                    next ? "Generated" : "Dominated",
+                    next_nt.id(),
+                    next_nt.n,
+                    format_nodetime(next_nt, map_),
+                    next_copy->g,
+                    format_bitset(get_once_off_bitset(next_copy), once_off_penalties_.size()),
+                    format_bitset(get_rectangle_bitset(next_copy), rectangle_penalties_.size()));
             }
             else
             {
-                println("        {} at end nt {}, n {}, xyt {}, g {}, once-off {}, rectangle {}, time g {}",
+                PRINTLN("        {} at end nt {}, n {}, xyt {}, g {}, once-off {}, rectangle {}, "
+                        "time g {}",
                         next ? "Generated" : "Dominated",
-                        next_nt.id,
+                        next_nt.id(),
                         next_nt.n,
                         format_nodetime(next_nt, map_),
                         next_copy->g,
@@ -1004,12 +1055,11 @@ void IndependentTimeIntervalAStar<feasible>::generate_end(Label* current)
         {
             add_path(next);
         }
-    }
-    while ((move_interval = move_interval->next));
+    } while ((move_interval = move_interval->next));
 }
 
-template<Bool feasible>
-template<Bool towards_end>
+template <Bool feasible>
+template <Bool towards_end>
 void IndependentTimeIntervalAStar<feasible>::expand(Label* current)
 {
     // ZoneScopedC(TRACY_COLOUR);
@@ -1050,7 +1100,7 @@ void IndependentTimeIntervalAStar<feasible>::expand(Label* current)
 }
 
 #ifdef USE_RESERVATION_LOOKUP
-template<Bool feasible>
+template <Bool feasible>
 Bool IndependentTimeIntervalAStar<feasible>::calculate_reservation(const NodeTime nt)
 {
     const auto& projection = problem_.projection();
@@ -1062,22 +1112,29 @@ Bool IndependentTimeIntervalAStar<feasible>::calculate_reservation(const NodeTim
 }
 #endif
 
-// static inline Bool approx_dominates(const Cost lhs_potential_g, const Cost rhs_potential_g,
-//                                     const UInt32 lhs_reservations, const UInt32 rhs_reservations)
+// static inline Bool approx_dominates(const Cost lhs_potential_g, const Cost
+// rhs_potential_g,
+//                                     const UInt32 lhs_reservations, const
+//                                     UInt32 rhs_reservations)
 // {
 //     return (is_lt(lhs_potential_g, rhs_potential_g)) ||
-//            (is_eq(lhs_potential_g, rhs_potential_g) && is_lt(lhs_reservations, rhs_reservations));
+//            (is_eq(lhs_potential_g, rhs_potential_g) &&
+//            is_lt(lhs_reservations, rhs_reservations));
 // }
-// static inline Bool dominates(const Cost lhs_potential_g, const Cost rhs_potential_g,
-//                              const UInt32 lhs_reservations, const UInt32 rhs_reservations)
+// static inline Bool dominates(const Cost lhs_potential_g, const Cost
+// rhs_potential_g,
+//                              const UInt32 lhs_reservations, const UInt32
+//                              rhs_reservations)
 // {
 //     return (lhs_potential_g <  rhs_potential_g) ||
-//            (lhs_potential_g == rhs_potential_g && lhs_reservations < rhs_reservations);
+//            (lhs_potential_g == rhs_potential_g && lhs_reservations <
+//            rhs_reservations);
 // }
 
-template<Bool feasible>
-template<Bool is_wait_action>
-typename IndependentTimeIntervalAStar<feasible>::Label* IndependentTimeIntervalAStar<feasible>::push(Label* next)
+template <Bool feasible>
+template <Bool is_wait_action>
+typename IndependentTimeIntervalAStar<feasible>::Label* IndependentTimeIntervalAStar<
+    feasible>::push(Label* next)
 {
     // ZoneScopedC(TRACY_COLOUR);
 
@@ -1089,20 +1146,22 @@ typename IndependentTimeIntervalAStar<feasible>::Label* IndependentTimeIntervalA
 #ifdef DEBUG
     for (auto current = closed_[nt.n]; current && current->next; current = current->next)
     {
-        debug_assert(current->nt.t <= current->next->nt.t);
+        DEBUG_ASSERT(current->nt.t <= current->next->nt.t);
     }
 #endif
 
     // Get the intervals.
     const auto wait_intervals = intervals_.get_intervals(nt.n, Direction::WAIT);
 
-    // Loop through existing labels with the same or earlier time to determine if the new label is dominated.
+    // Loop through existing labels with the same or earlier time to determine if the new label is
+    // dominated.
     const auto next_once_off_bitset = get_once_off_bitset(next);
     const auto next_rectangle_bitset = get_rectangle_bitset(next);
     auto& first = closed_[nt.n];
     Label** insert_prev_next = &first;
     const auto current = next->parent;
-    for (auto existing = *insert_prev_next; existing && existing->nt.t <= nt.t; existing = *insert_prev_next)
+    for (auto existing = *insert_prev_next; existing && existing->nt.t <= nt.t;
+         existing = *insert_prev_next)
     {
         if (!is_wait_action || existing != current)
         {
@@ -1110,22 +1169,22 @@ typename IndependentTimeIntervalAStar<feasible>::Label* IndependentTimeIntervalA
             const auto existing_g = existing->g;
             const auto existing_t = existing->nt.t;
 
-            // Calculate the potential cost of the existing label if it incurred the same penalties as the new label.
-            // If the existing label still costs less than or equal to the new label, even after incurring these
-            // penalties, then the new label is dominated.
+            // Calculate the potential cost of the existing label if it incurred the same penalties
+            // as the new label. If the existing label still costs less than or equal to the new
+            // label, even after incurring these penalties, then the new label is dominated.
             const auto existing_once_off_bitset = get_once_off_bitset(existing);
             const auto existing_rectangle_bitset = get_rectangle_bitset(existing);
             auto existing_potential_g = existing_g;
-            for (Size index = 0; index < once_off_penalties_.size(); ++index)
+            for (Size64 index = 0; index < once_off_penalties_.size(); ++index)
             {
-                const auto existing_not_paid =
-                    (get_bitset(next_once_off_bitset, index) > get_bitset(existing_once_off_bitset, index));
+                const auto existing_not_paid = (get_bitset(next_once_off_bitset, index) >
+                                                get_bitset(existing_once_off_bitset, index));
                 existing_potential_g += once_off_penalties_[index].cost * existing_not_paid;
             }
-            for (Size index = 0; index < rectangle_penalties_.size(); ++index)
+            for (Size64 index = 0; index < rectangle_penalties_.size(); ++index)
             {
-                const auto existing_not_paid =
-                    (get_bitset(existing_rectangle_bitset, index) > get_bitset(next_rectangle_bitset, index));
+                const auto existing_not_paid = (get_bitset(existing_rectangle_bitset, index) >
+                                                get_bitset(next_rectangle_bitset, index));
                 existing_potential_g += rectangle_penalties_[index].cost * existing_not_paid;
             }
 
@@ -1137,14 +1196,15 @@ typename IndependentTimeIntervalAStar<feasible>::Label* IndependentTimeIntervalA
                     const auto wait_start = std::max(existing_t, wait_interval->start);
                     const auto wait_end = std::min(next_t, wait_interval->end);
                     const auto duration_in_wait_interval = std::max(wait_end - wait_start, 0);
-                    debug_assert(wait_start >= 0);
-                    debug_assert(wait_end >= 0);
-                    debug_assert(duration_in_wait_interval >= 0);
-                    existing_potential_g += duration_in_wait_interval == 0 ?
-                                            0.0 :
-                                            duration_in_wait_interval * (default_edge_cost + wait_interval->cost);
-                }
-                while (wait_interval->next && (wait_interval = wait_interval->next)->start < next_t);
+                    DEBUG_ASSERT(wait_start >= 0);
+                    DEBUG_ASSERT(wait_end >= 0);
+                    DEBUG_ASSERT(duration_in_wait_interval >= 0);
+                    existing_potential_g +=
+                        duration_in_wait_interval == 0 ?
+                            0.0 :
+                            duration_in_wait_interval * (default_edge_cost + wait_interval->cost);
+                } while (wait_interval->next &&
+                         (wait_interval = wait_interval->next)->start < next_t);
             }
 
             // Discard the new label if dominated.
@@ -1171,23 +1231,24 @@ typename IndependentTimeIntervalAStar<feasible>::Label* IndependentTimeIntervalA
             // Get the existing label.
             const auto existing_g = existing->g;
             const auto existing_t = existing->nt.t;
-            debug_assert(existing_t >= next_t);
+            DEBUG_ASSERT(existing_t >= next_t);
 
-            // Make the same calculation in the other direction. The new label could be better than the existing label if
-            // the new label visited a superset of the once-off penalties visited by the existing label.
+            // Make the same calculation in the other direction. The new label could be better than
+            // the existing label if the new label visited a superset of the once-off penalties
+            // visited by the existing label.
             const auto existing_once_off_bitset = get_once_off_bitset(existing);
             const auto existing_rectangle_bitset = get_rectangle_bitset(existing);
             auto next_potential_g = next->g;
-            for (Size index = 0; index < once_off_penalties_.size(); ++index)
+            for (Size64 index = 0; index < once_off_penalties_.size(); ++index)
             {
-                const auto next_not_paid =
-                    (get_bitset(existing_once_off_bitset, index) > get_bitset(next_once_off_bitset, index));
+                const auto next_not_paid = (get_bitset(existing_once_off_bitset, index) >
+                                            get_bitset(next_once_off_bitset, index));
                 next_potential_g += once_off_penalties_[index].cost * next_not_paid;
             }
-            for (Size index = 0; index < rectangle_penalties_.size(); ++index)
+            for (Size64 index = 0; index < rectangle_penalties_.size(); ++index)
             {
-                const auto next_not_paid =
-                    (get_bitset(next_rectangle_bitset, index) > get_bitset(existing_rectangle_bitset, index));
+                const auto next_not_paid = (get_bitset(next_rectangle_bitset, index) >
+                                            get_bitset(existing_rectangle_bitset, index));
                 next_potential_g += rectangle_penalties_[index].cost * next_not_paid;
             }
 
@@ -1199,14 +1260,15 @@ typename IndependentTimeIntervalAStar<feasible>::Label* IndependentTimeIntervalA
                     const auto wait_start = std::max(next_t, wait_interval->start);
                     const auto wait_end = std::min(existing_t, wait_interval->end);
                     const auto duration_in_wait_interval = std::max(wait_end - wait_start, 0);
-                    debug_assert(wait_start >= 0);
-                    debug_assert(wait_end >= 0);
-                    debug_assert(duration_in_wait_interval >= 0);
-                    next_potential_g += duration_in_wait_interval == 0 ?
-                                        0.0 :
-                                        duration_in_wait_interval * (default_edge_cost + wait_interval->cost);
-                }
-                while (wait_interval->next && (wait_interval = wait_interval->next)->start < existing_t);
+                    DEBUG_ASSERT(wait_start >= 0);
+                    DEBUG_ASSERT(wait_end >= 0);
+                    DEBUG_ASSERT(duration_in_wait_interval >= 0);
+                    next_potential_g +=
+                        duration_in_wait_interval == 0 ?
+                            0.0 :
+                            duration_in_wait_interval * (default_edge_cost + wait_interval->cost);
+                } while (wait_interval->next &&
+                         (wait_interval = wait_interval->next)->start < existing_t);
             }
 
             // Delete the existing label if dominated.
@@ -1216,7 +1278,7 @@ typename IndependentTimeIntervalAStar<feasible>::Label* IndependentTimeIntervalA
                 if (existing->pq_index >= 0)
                 {
                     open_.erase(existing->pq_index);
-                    debug_assert(existing->pq_index == -1);
+                    DEBUG_ASSERT(existing->pq_index == -1);
                 }
 
                 // Delete the existing label from future dominance checks.
@@ -1235,7 +1297,7 @@ typename IndependentTimeIntervalAStar<feasible>::Label* IndependentTimeIntervalA
     }
 
     // Link in the new label.
-    debug_assert(insert_prev_next);
+    DEBUG_ASSERT(insert_prev_next);
     next->next = *insert_prev_next;
     *insert_prev_next = next;
 
@@ -1243,25 +1305,25 @@ typename IndependentTimeIntervalAStar<feasible>::Label* IndependentTimeIntervalA
 #ifdef DEBUG
     for (auto current = closed_[nt.n]; current && current->next; current = current->next)
     {
-        debug_assert(current->nt.t <= current->next->nt.t);
+        DEBUG_ASSERT(current->nt.t <= current->next->nt.t);
     }
 #endif
 
     // Store the new label.
     label_storage_.commit_buffer();
     open_.push(next);
-    debug_assert(next->pq_index >= 0);
+    DEBUG_ASSERT(next->pq_index >= 0);
 
     // Stored the new label.
     return next;
 }
 
-template<Bool feasible>
+template <Bool feasible>
 void IndependentTimeIntervalAStar<feasible>::add_path(Label* end)
 {
     ZoneScopedC(TRACY_COLOUR);
 
-    debug_assert(is_end(end->nt));
+    DEBUG_ASSERT(is_end(end->nt));
     const auto reduced_cost = end->g;
     if (is_lt(reduced_cost, 0.0))
     {
@@ -1274,9 +1336,10 @@ void IndependentTimeIntervalAStar<feasible>::add_path(Label* end)
 
             last = end->parent;
             NodeTime nt{last->nt.n, end->nt.t};
-            debug_assert(nt.n == target_);
+            DEBUG_ASSERT(nt.n == target_);
             path[nt.t] = Edge{nt.n, Direction::INVALID};
-            for (auto label = (end->nt.t == last->nt.t ? last->parent : last); label; label = label->parent)
+            for (auto label = (end->nt.t == last->nt.t ? last->parent : last); label;
+                 label = label->parent)
             {
                 const auto prev_nt = label->nt;
                 path[nt.t - 1] = Edge{prev_nt.n, map_.get_direction(prev_nt.n, nt.n)};
@@ -1292,30 +1355,32 @@ void IndependentTimeIntervalAStar<feasible>::add_path(Label* end)
 #ifdef DEBUG
         if (verbose)
         {
-            println("            Time-interval A* found path of length {}, reduced cost {}: {}",
-                    path.size(), reduced_cost, format_path_with_time(path, map_));
+            PRINTLN("            Time-interval A* found path of length {}, reduced cost {}: {}",
+                    path.size(),
+                    reduced_cost,
+                    format_path_with_time(path, map_));
         }
 #endif
 
         // Check.
 #ifdef DEBUG
-        debug_assert(path.size() == end->nt.t + 1);
-        debug_assert(path.front().n == start_.n);
-        debug_assert(path.back().n == target_);
-        debug_assert(path.back().n == last->nt.n);
+        DEBUG_ASSERT(path.size() == end->nt.t + 1);
+        DEBUG_ASSERT(path.front().n == start_.n);
+        DEBUG_ASSERT(path.back().n == target_);
+        DEBUG_ASSERT(path.back().n == last->nt.n);
         for (auto label = last; label; label = label->parent)
         {
-            debug_assert(path[label->nt.t].n == label->nt.n);
-            debug_assert(!label->parent || path[label->nt.t - 1].n == label->parent->nt.n);
+            DEBUG_ASSERT(path[label->nt.t].n == label->nt.n);
+            DEBUG_ASSERT(!label->parent || path[label->nt.t - 1].n == label->parent->nt.n);
         }
         for (Time t = 0; t < path.size() - 1; ++t)
         {
-            debug_assert(map_[path[t].n]);
-            debug_assert(map_.get_destination(path[t]) == path[t + 1].n);
+            DEBUG_ASSERT(map_[path[t].n]);
+            DEBUG_ASSERT(map_.get_destination(path[t]) == path[t + 1].n);
 
             const auto [x1, y1] = map_.get_xy(path[t].n);
             const auto [x2, y2] = map_.get_xy(path[t + 1].n);
-            debug_assert(std::abs(x2 - x1) + std::abs(y2 - y2) <= 1);
+            DEBUG_ASSERT(std::abs(x2 - x1) + std::abs(y2 - y2) <= 1);
         }
 #endif
 
@@ -1330,7 +1395,7 @@ void IndependentTimeIntervalAStar<feasible>::add_path(Label* end)
     }
 }
 
-template<Bool feasible>
+template <Bool feasible>
 Cost IndependentTimeIntervalAStar<feasible>::solve()
 {
     ZoneScopedC(TRACY_COLOUR);
@@ -1338,7 +1403,7 @@ Cost IndependentTimeIntervalAStar<feasible>::solve()
     // Run time-expanded A* to validate results.
 #ifdef CHECK_USING_ASTAR
     const auto astar_obj = astar_.solve();
-    // const auto astar_obj = std::numeric_limits<Cost>::quiet_NaN();
+    // const auto astar_obj = COST_NAN;
 #endif
 
     // Print iteration.
@@ -1346,13 +1411,13 @@ Cost IndependentTimeIntervalAStar<feasible>::solve()
 #ifdef DEBUG
     if (verbose)
     {
-        print_separator();
+        PRINT_SEP();
         String str;
         for (const auto nt : waypoints_)
         {
             if (str.empty())
             {
-                str += " via " ;
+                str += " via ";
             }
             else
             {
@@ -1360,9 +1425,13 @@ Cost IndependentTimeIntervalAStar<feasible>::solve()
             }
             str += format_nodetime(nt, map_);
         }
-        println("Running time-interval A* for agent {} from {} to {}{} in iteration {}",
-                a_, format_node(start_.n, map_), format_node(target_, map_), str, iter);
-        println("");
+        PRINTLN("Running time-interval A* for agent {} from {} to {}{} in iteration {}",
+                a_,
+                format_node(start_.n, map_),
+                format_node(target_, map_),
+                str,
+                iter);
+        PRINTLN("");
     }
 #endif
 
@@ -1377,19 +1446,19 @@ Cost IndependentTimeIntervalAStar<feasible>::solve()
 
     // Compute the earliest and latest target time.
     {
-        // ZoneScopedNC("Compute the earliest and latest target time", TRACY_COLOUR);
+        // ZoneScopedNC("Compute the earliest and latest target time",
+        // TRACY_COLOUR);
 
         earliest_target_time_ = -1;
         auto interval = intervals_.get_end_intervals();
         do
         {
-            if (interval->cost < INF)
+            if (interval->cost < COST_INF)
             {
                 earliest_target_time_ = interval->start;
                 break;
             }
-        }
-        while ((interval = interval->next));
+        } while ((interval = interval->next));
         if (earliest_target_time_ < 0)
         {
             goto FINISHED;
@@ -1397,7 +1466,7 @@ Cost IndependentTimeIntervalAStar<feasible>::solve()
 
         latest_target_time_ = -1;
         for (; interval; interval = interval->next)
-            if (interval->cost < INF)
+            if (interval->cost < COST_INF)
             {
                 latest_target_time_ = interval->end - 1;
             }
@@ -1409,7 +1478,8 @@ Cost IndependentTimeIntervalAStar<feasible>::solve()
 
     // Compute the minimum time between each waypoint.
     {
-        // ZoneScopedNC("Compute the minimum time between each waypoint", TRACY_COLOUR);
+        // ZoneScopedNC("Compute the minimum time between each waypoint",
+        // TRACY_COLOUR);
 
         // Sort the waypoints by time and insert the target at the back.
         std::sort(waypoints_.begin(),
@@ -1420,7 +1490,7 @@ Cost IndependentTimeIntervalAStar<feasible>::solve()
         // Calculate the lower bound from each waypoint to the next waypoint.
         h_waypoint_to_target_.resize(waypoints_.size());
         h_waypoint_to_target_.back() = 0;
-        for (Size w = waypoints_.size() - 2; w >= 0; --w)
+        for (Size64 w = waypoints_.size() - 2; w >= 0; --w)
         {
             const auto h = distance_heuristic_.get_h(waypoints_[w + 1].n)[waypoints_[w].n];
             const auto time_diff = waypoints_[w + 1].t - waypoints_[w].t;
@@ -1451,10 +1521,22 @@ Cost IndependentTimeIntervalAStar<feasible>::solve()
 
     // Print penalties.
 #ifdef DEBUG
-    if (verbose) { println("Constant: {:.4f}\n", constant_); }
-    if (verbose) { intervals_.print(); }
-    if (verbose) { once_off_penalties_.print(map_); }
-    if (verbose) { rectangle_penalties_.print(map_); }
+    if (verbose)
+    {
+        PRINTLN("Constant: {:.4f}\n", constant_);
+    }
+    if (verbose)
+    {
+        intervals_.print();
+    }
+    if (verbose)
+    {
+        once_off_penalties_.print(map_);
+    }
+    if (verbose)
+    {
+        rectangle_penalties_.print(map_);
+    }
 #endif
 
     // Solve.
@@ -1479,7 +1561,10 @@ Cost IndependentTimeIntervalAStar<feasible>::solve()
             ZoneScopedNC("Solving to one waypoint", TRACY_COLOUR);
 
 #ifdef DEBUG
-            if (verbose) { println("Searching to waypoint {}", format_nodetime(next_waypoint, map_)); }
+            if (verbose)
+            {
+                PRINTLN("Searching to waypoint {}", format_nodetime(next_waypoint, map_));
+            }
 #endif
             while (!open_.empty())
             {
@@ -1489,7 +1574,7 @@ Cost IndependentTimeIntervalAStar<feasible>::solve()
                 // Pop the first item off the priority queue.
                 auto current = open_.pop();
                 const auto nt = current->nt;
-                debug_assert(nt.t <= next_waypoint.t);
+                DEBUG_ASSERT(nt.t <= next_waypoint.t);
 
                 // Print.
 #ifdef DEBUG
@@ -1497,28 +1582,34 @@ Cost IndependentTimeIntervalAStar<feasible>::solve()
                 {
                     if constexpr (feasible)
                     {
-                        println("    Popped nt {}, n {}, xyt {}, f {}, g {}, once-off {}, rectangle {}, reservations {}",
-                                nt.id,
-                                nt.n,
-                                format_nodetime(nt, map_),
-                                current->f,
-                                current->g,
-                                format_bitset(get_once_off_bitset(current), once_off_penalties_.size()),
-                                format_bitset(get_rectangle_bitset(current), rectangle_penalties_.size()),
-                                current->reservations);
+                        PRINTLN(
+                            "    Popped nt {}, n {}, xyt {}, f {}, g {}, once-off {}, rectangle "
+                            "{}, reservations {}",
+                            nt.id(),
+                            nt.n,
+                            format_nodetime(nt, map_),
+                            current->f,
+                            current->g,
+                            format_bitset(get_once_off_bitset(current), once_off_penalties_.size()),
+                            format_bitset(get_rectangle_bitset(current),
+                                          rectangle_penalties_.size()),
+                            current->reservations);
                     }
                     else
                     {
-                        println("    Popped nt {}, n {}, xyt {}, g {}, once-off {}, rectangle {}, reservations {}, time f {}, time g {}",
-                                nt.id,
-                                nt.n,
-                                format_nodetime(nt, map_),
-                                current->g,
-                                format_bitset(get_once_off_bitset(current), once_off_penalties_.size()),
-                                format_bitset(get_rectangle_bitset(current), rectangle_penalties_.size()),
-                                current->reservations,
-                                current->time_f,
-                                current->nt.t);
+                        PRINTLN(
+                            "    Popped nt {}, n {}, xyt {}, g {}, once-off {}, rectangle {}, "
+                            "reservations {}, time f {}, time g {}",
+                            nt.id(),
+                            nt.n,
+                            format_nodetime(nt, map_),
+                            current->g,
+                            format_bitset(get_once_off_bitset(current), once_off_penalties_.size()),
+                            format_bitset(get_rectangle_bitset(current),
+                                          rectangle_penalties_.size()),
+                            current->reservations,
+                            current->time_f,
+                            current->nt.t);
                     }
                 }
 #endif
@@ -1551,7 +1642,10 @@ Cost IndependentTimeIntervalAStar<feasible>::solve()
             ZoneScopedNC("Solving to one waypoint", TRACY_COLOUR);
 
 #ifdef DEBUG
-            if (verbose) { println("Searching to waypoint {}", format_nodetime(next_waypoint, map_)); }
+            if (verbose)
+            {
+                PRINTLN("Searching to waypoint {}", format_nodetime(next_waypoint, map_));
+            }
 #endif
             while (!open_.empty())
             {
@@ -1561,7 +1655,7 @@ Cost IndependentTimeIntervalAStar<feasible>::solve()
                 // Pop the first item off the priority queue.
                 auto current = open_.pop();
                 const auto nt = current->nt;
-                debug_assert(nt.t <= latest_target_time_);
+                DEBUG_ASSERT(nt.t <= latest_target_time_);
 
                 // Print.
 #ifdef DEBUG
@@ -1569,28 +1663,34 @@ Cost IndependentTimeIntervalAStar<feasible>::solve()
                 {
                     if constexpr (feasible)
                     {
-                        println("    Popped nt {}, n {}, xyt {}, f {}, g {}, once-off {}, rectangle {}, reservations {}",
-                                nt.id,
-                                nt.n,
-                                format_nodetime(nt, map_),
-                                current->f,
-                                current->g,
-                                format_bitset(get_once_off_bitset(current), once_off_penalties_.size()),
-                                format_bitset(get_rectangle_bitset(current), rectangle_penalties_.size()),
-                                current->reservations);
+                        PRINTLN(
+                            "    Popped nt {}, n {}, xyt {}, f {}, g {}, once-off {}, rectangle "
+                            "{}, reservations {}",
+                            nt.id(),
+                            nt.n,
+                            format_nodetime(nt, map_),
+                            current->f,
+                            current->g,
+                            format_bitset(get_once_off_bitset(current), once_off_penalties_.size()),
+                            format_bitset(get_rectangle_bitset(current),
+                                          rectangle_penalties_.size()),
+                            current->reservations);
                     }
                     else
                     {
-                        println("    Popped nt {}, n {}, xyt {}, g {}, once-off {}, rectangle {}, reservations {}, time f {}, time g {}",
-                                nt.id,
-                                nt.n,
-                                format_nodetime(nt, map_),
-                                current->g,
-                                format_bitset(get_once_off_bitset(current), once_off_penalties_.size()),
-                                format_bitset(get_rectangle_bitset(current), rectangle_penalties_.size()),
-                                current->reservations,
-                                current->time_f,
-                                current->nt.t);
+                        PRINTLN(
+                            "    Popped nt {}, n {}, xyt {}, g {}, once-off {}, rectangle {}, "
+                            "reservations {}, time f {}, time g {}",
+                            nt.id(),
+                            nt.n,
+                            format_nodetime(nt, map_),
+                            current->g,
+                            format_bitset(get_once_off_bitset(current), once_off_penalties_.size()),
+                            format_bitset(get_rectangle_bitset(current),
+                                          rectangle_penalties_.size()),
+                            current->reservations,
+                            current->time_f,
+                            current->nt.t);
                     }
                 }
 #endif
@@ -1607,18 +1707,21 @@ Cost IndependentTimeIntervalAStar<feasible>::solve()
             }
         }
     }
-    FINISHED:
+FINISHED:
 
     // Check optimal value against results from time-expanded A*.
 #ifdef CHECK_USING_ASTAR
-    debug_assert(std::isnan(astar_obj) || is_eq(obj_, astar_obj));
+    DEBUG_ASSERT(std::isnan(astar_obj) || is_eq(obj_, astar_obj));
 #endif
 
     // Print.
 #ifdef DEBUG
     if (verbose)
     {
-        if (obj_ >= 0.0) { println("Time-interval A* failed to find a feasible path"); }
+        if (obj_ >= 0.0)
+        {
+            PRINTLN("Time-interval A* failed to find a feasible path");
+        }
     }
 #endif
 
@@ -1634,7 +1737,7 @@ Cost IndependentTimeIntervalAStar<feasible>::solve()
     return obj_;
 }
 
-template<Bool feasible>
+template <Bool feasible>
 void IndependentTimeIntervalAStar<feasible>::add_waypoint(const NodeTime nt)
 {
     ZoneScopedC(TRACY_COLOUR);
@@ -1648,7 +1751,7 @@ void IndependentTimeIntervalAStar<feasible>::add_waypoint(const NodeTime nt)
     waypoints_.push_back(nt);
 }
 
-template<Bool feasible>
+template <Bool feasible>
 void IndependentTimeIntervalAStar<feasible>::set_constant(const Cost constant)
 {
     ZoneScopedC(TRACY_COLOUR);
@@ -1658,18 +1761,19 @@ void IndependentTimeIntervalAStar<feasible>::set_constant(const Cost constant)
     astar_.set_constant(constant);
 #endif
 
-    // Overwrite the constasnt.
+    // Overwrite the constant.
     constant_ = constant;
 }
 
-template<Bool feasible>
-void IndependentTimeIntervalAStar<feasible>::add_nodetime_penalty(const NodeTime nt, const Cost cost)
+template <Bool feasible>
+void IndependentTimeIntervalAStar<feasible>::add_nodetime_penalty(const NodeTime nt,
+                                                                  const Cost cost)
 {
     ZoneScopedC(TRACY_COLOUR);
 
     // Check.
-    debug_assert(map_[nt.n]);
-    debug_assert(cost >= 0.0);
+    DEBUG_ASSERT(map_[nt.n]);
+    DEBUG_ASSERT(cost >= 0.0);
 
     // Ignore if the target is unreachable or the penalty is 0.
     if (h_to_waypoint_[nt.n] == TIME_MAX || is_le(cost, 0.0))
@@ -1686,7 +1790,10 @@ void IndependentTimeIntervalAStar<feasible>::add_nodetime_penalty(const NodeTime
 #ifdef DEBUG
     if (verbose)
     {
-        println("    Adding nodetime penalty at {} of cost {} to agent {}", format_nodetime(nt, map_), cost, a_);
+        PRINTLN("    Adding nodetime penalty at {} of cost {} to agent {}",
+                format_nodetime(nt, map_),
+                cost,
+                a_);
     }
 #endif
 
@@ -1718,14 +1825,15 @@ void IndependentTimeIntervalAStar<feasible>::add_nodetime_penalty(const NodeTime
     }
 }
 
-template<Bool feasible>
-void IndependentTimeIntervalAStar<feasible>::add_edgetime_penalty(const EdgeTime et, const Cost cost)
+template <Bool feasible>
+void IndependentTimeIntervalAStar<feasible>::add_edgetime_penalty(const EdgeTime et,
+                                                                  const Cost cost)
 {
     ZoneScopedC(TRACY_COLOUR);
 
     // Check.
-    debug_assert(map_[et.n]);
-    debug_assert(cost >= 0.0);
+    DEBUG_ASSERT(map_[et.n]);
+    DEBUG_ASSERT(cost >= 0.0);
 
     // Ignore if the target is unreachable or the penalty is 0.
     if (h_to_waypoint_[et.n] == TIME_MAX || is_le(cost, 0.0))
@@ -1742,7 +1850,10 @@ void IndependentTimeIntervalAStar<feasible>::add_edgetime_penalty(const EdgeTime
 #ifdef DEBUG
     if (verbose)
     {
-        println("    Adding edgetime penalty at {} of cost {} to agent {}", format_edgetime(et, map_), cost, a_);
+        PRINTLN("    Adding edgetime penalty at {} of cost {} to agent {}",
+                format_edgetime(et, map_),
+                cost,
+                a_);
     }
 #endif
 
@@ -1756,15 +1867,16 @@ void IndependentTimeIntervalAStar<feasible>::add_edgetime_penalty(const EdgeTime
     }
 }
 
-template<Bool feasible>
-template<OnceOffDirection d>
-void IndependentTimeIntervalAStar<feasible>::add_once_off_penalty(const NodeTime nt, const Cost cost)
+template <Bool feasible>
+template <OnceOffDirection d>
+void IndependentTimeIntervalAStar<feasible>::add_once_off_penalty(const NodeTime nt,
+                                                                  const Cost cost)
 {
     ZoneScopedC(TRACY_COLOUR);
 
     // Check.
-    debug_assert(map_[nt.n]);
-    debug_assert(cost >= 0.0);
+    DEBUG_ASSERT(map_[nt.n]);
+    DEBUG_ASSERT(cost >= 0.0);
 
     // Ignore if the target is unreachable or the penalty is 0.
     if (h_to_waypoint_[nt.n] == TIME_MAX || is_le(cost, 0.0))
@@ -1781,18 +1893,21 @@ void IndependentTimeIntervalAStar<feasible>::add_once_off_penalty(const NodeTime
 #ifdef DEBUG
     if (verbose)
     {
-        println("    Adding once-off penalty at {} of cost {} to agent {}",
-                format_nodetime(nt, map_), cost, a_);
+        PRINTLN("    Adding once-off penalty at {} of cost {} to agent {}",
+                format_nodetime(nt, map_),
+                cost,
+                a_);
     }
 #endif
 
-    // If the node is blocked after a certain time, add it as a penalty. Otherwise handle it in the search because the
-    // penalty is only incurred at most once.
-    if (cost == INF)
+    // If the node is blocked after a certain time, add it as a penalty. Otherwise handle it in the
+    // search because the penalty is only incurred at most once.
+    if (cost == COST_INF)
     {
         // TODO
-        release_assert(d == OnceOffDirection::GEq,
-                       "once-off penalty with <= time direction is not yet supported for infinite cost");
+        ASSERT(d == OnceOffDirection::GEq,
+               "once-off penalty with <= time direction is not yet "
+               "supported for infinite cost");
 
         // Add the penalty to the five outgoing directions.
         if (const auto to_n = map_.get_north(nt.n); map_[to_n])
@@ -1826,8 +1941,8 @@ void IndependentTimeIntervalAStar<feasible>::add_once_off_penalty(const NodeTime
         // Add the once-off penalty.
         once_off_penalties_.add(cost, nt, d);
 
-        // If the once-off penalty can be bypassed by waiting at a neighbour node, add intervals to facilitate this
-        // bypass.
+        // If the once-off penalty can be bypassed by waiting at a neighbour node, add intervals to
+        // facilitate this bypass.
         if constexpr (d == OnceOffDirection::LEq)
         {
             if (const auto from_n = map_.get_north(nt.n); map_[from_n])
@@ -1849,6 +1964,7 @@ void IndependentTimeIntervalAStar<feasible>::add_once_off_penalty(const NodeTime
         }
     }
 }
+
 template void IndependentTimeIntervalAStar<true>::add_once_off_penalty<OnceOffDirection::LEq>(
     const NodeTime nt, const Cost cost);
 template void IndependentTimeIntervalAStar<true>::add_once_off_penalty<OnceOffDirection::GEq>(
@@ -1858,7 +1974,7 @@ template void IndependentTimeIntervalAStar<false>::add_once_off_penalty<OnceOffD
 template void IndependentTimeIntervalAStar<false>::add_once_off_penalty<OnceOffDirection::GEq>(
     const NodeTime nt, const Cost cost);
 
-template<Bool feasible>
+template <Bool feasible>
 void IndependentTimeIntervalAStar<feasible>::add_rectangle_penalty(const EdgeTime first_entry,
                                                                    const EdgeTime first_exit,
                                                                    const Time length,
@@ -1868,7 +1984,7 @@ void IndependentTimeIntervalAStar<feasible>::add_rectangle_penalty(const EdgeTim
     ZoneScopedC(TRACY_COLOUR);
 
     // Check.
-    debug_assert(cost >= 0.0);
+    DEBUG_ASSERT(cost >= 0.0);
 
     // Ignore if the the penalty is 0.
     if (is_le(cost, 0.0))
@@ -1885,8 +2001,11 @@ void IndependentTimeIntervalAStar<feasible>::add_rectangle_penalty(const EdgeTim
 #ifdef DEBUG
     if (verbose)
     {
-        println("    Adding rectangle penalty from {} and {} of cost {} to agent {}",
-                format_edgetime(first_entry, map_), format_edgetime(first_exit, map_), cost, a_);
+        PRINTLN("    Adding rectangle penalty from {} and {} of cost {} to agent {}",
+                format_edgetime(first_entry, map_),
+                format_edgetime(first_exit, map_),
+                cost,
+                a_);
     }
 #endif
 
@@ -1917,13 +2036,14 @@ void IndependentTimeIntervalAStar<feasible>::add_rectangle_penalty(const EdgeTim
     }
 }
 
-template<Bool feasible>
-void IndependentTimeIntervalAStar<feasible>::add_end_penalty(const Time earliest, const Time latest, const Cost cost)
+template <Bool feasible>
+void IndependentTimeIntervalAStar<feasible>::add_end_penalty(const Time earliest, const Time latest,
+                                                             const Cost cost)
 {
     ZoneScopedC(TRACY_COLOUR);
 
     // Ignore if the penalty is 0.
-    debug_assert(cost >= 0.0);
+    DEBUG_ASSERT(cost >= 0.0);
     if (is_le(cost, 0.0))
     {
         return;
@@ -1938,38 +2058,46 @@ void IndependentTimeIntervalAStar<feasible>::add_end_penalty(const Time earliest
 #ifdef DEBUG
     if (verbose)
     {
-        println("    Adding end penalty on interval [{},{}) of cost {} to agent {}", earliest, latest, cost, a_);
+        PRINTLN("    Adding end penalty on interval [{},{}) of cost {} to agent {}",
+                earliest,
+                latest,
+                cost,
+                a_);
     }
 #endif
 
     // Add the penalty.
-    debug_assert((earliest == 0) ^ (latest == TIME_MAX));
+    DEBUG_ASSERT((earliest == 0) ^ (latest == TIME_MAX));
     intervals_.add_end_penalty(earliest, latest, cost);
 }
 
 // template<Bool feasible>
-// String IndependentTimeIntervalAStar<feasible>::format_label(const Label* const label) const
+// String IndependentTimeIntervalAStar<feasible>::format_label(const Label*
+// const label) const
 // {
 //     const auto nt = label->nt;
 //     if constexpr (feasible)
 //     {
-//         return fmt::format("nt {}, n {}, xyt {}, f {}, g {}, reservations {}, parent {}, ptr {}",
-//                            nt.id, nt.n, format_nodetime(nt, map_), label->f, label->g, label->reservations,
-//                            label->parent ? format_nodetime(label->parent->nt, map_) : "-",
+//         return fmt::format("nt {}, n {}, xyt {}, f {}, g {}, reservations {},
+//         parent {}, ptr {}",
+//                            nt.id(), nt.n, format_nodetime(nt, map_), label->f,
+//                            label->g, label->reservations, label->parent ?
+//                            format_nodetime(label->parent->nt, map_) : "-",
 //                            fmt::ptr(label));
 //     }
 //     else
 //     {
-//         return fmt::format("nt {}, n {}, xyt {}, g {}, reservations {}, time f {}, time g {}, parent {}, ptr {}",
-//                            nt.id, nt.n, format_nodetime(nt, map_), label->g, label->reservations,
-//                            label->time_f, label->nt.t,
-//                            label->parent ? format_nodetime(label->parent->nt, map_) : "-",
-//                            fmt::ptr(label));
+//         return fmt::format("nt {}, n {}, xyt {}, g {}, reservations {}, time
+//         f {}, time g {}, parent {}, ptr {}",
+//                            nt.id(), nt.n, format_nodetime(nt, map_), label->g,
+//                            label->reservations, label->time_f, label->nt.t,
+//                            label->parent ? format_nodetime(label->parent->nt,
+//                            map_) : "-", fmt::ptr(label));
 //     }
 // }
 
 #ifdef DEBUG
-template<Bool feasible>
+template <Bool feasible>
 void IndependentTimeIntervalAStar<feasible>::set_verbose(const Bool value)
 {
     verbose = value;
@@ -1978,3 +2106,5 @@ void IndependentTimeIntervalAStar<feasible>::set_verbose(const Bool value)
 
 template class IndependentTimeIntervalAStar<true>;
 template class IndependentTimeIntervalAStar<false>;
+
+#endif

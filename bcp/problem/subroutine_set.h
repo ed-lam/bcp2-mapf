@@ -7,26 +7,48 @@ Author: Edward Lam <ed@ed-lam.com>
 
 #pragma once
 
-#include "types/basic_types.h"
 #include "types/tuple.h"
 
+class Problem;
+struct Instance;
+
 // Container storing subroutines using static polymorphism
-template<class... SubroutineTypes>
+template <class... SubroutineTypes>
 struct SubroutineSet : public Tuple<SubroutineTypes...>
 {
+    using Base = Tuple<SubroutineTypes...>;
+
     SubroutineSet(const Instance& instance, Problem& problem) :
-        Tuple<SubroutineTypes...>(SubroutineTypes{instance, problem}...) {}
+        Base(SubroutineTypes(instance, problem)...)
+    {
+    }
 
-    constexpr static auto size() { return std::tuple_size<Tuple<SubroutineTypes...>>(); }
+    constexpr static auto size()
+    {
+        return std::tuple_size<Base>();
+    }
 
-    // template<Size index>
-    // const auto& get() const { return std::get<index>(*this); }
-    // template<Size index>
-    // auto& get() { return std::get<index>(*this); }
+    template <class T>
+    auto apply(T&& f)
+    {
+        return std::apply(f, *static_cast<Base*>(this));
+    }
+
+    template <class T>
+    auto apply(T&& f) const
+    {
+        return std::apply(f, *static_cast<const Base*>(this));
+    }
 };
 
-template<class... SubroutineTypes>
-struct std::tuple_size<SubroutineSet<SubroutineTypes...>> :
-    std::integral_constant<std::size_t, sizeof...(SubroutineTypes)>
+template <class... SubroutineTypes>
+struct std::tuple_size<SubroutineSet<SubroutineTypes...>>
+    : integral_constant<size_t, sizeof...(SubroutineTypes)>
 {
+};
+
+template <size_t I, class... SubroutineTypes>
+struct std::tuple_element<I, SubroutineSet<SubroutineTypes...>>
+{
+    using type = tuple_element_t<I, tuple<SubroutineTypes...>>;
 };

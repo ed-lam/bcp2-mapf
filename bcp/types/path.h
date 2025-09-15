@@ -9,6 +9,7 @@ Author: Edward Lam <ed@ed-lam.com>
 
 #include "types/map_types.h"
 #include "types/span.h"
+#include <algorithm>
 
 using Path = Span<const Edge>;
 

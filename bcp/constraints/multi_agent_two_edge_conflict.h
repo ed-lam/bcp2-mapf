@@ -15,7 +15,7 @@ Author: Edward Lam <ed@ed-lam.com>
 
 class MultiAgentTwoEdgeConflictSeparator : public Separator
 {
-    struct MultiAgentTwoEdgeConstraint : public Constraint
+    struct ConstraintData
     {
         Agent every_agent;
         Agent canonical;
@@ -25,8 +25,8 @@ class MultiAgentTwoEdgeConflictSeparator : public Separator
     };
     struct MultiAgentTwoEdgeConstraintCandidate
     {
-        Float lhs;
-        Size num_other;
+        Real64 lhs;
+        Size64 num_other;
         Agent canonical;
         Time t;
         Array<Edge, 3> canonical_es;
@@ -35,7 +35,7 @@ class MultiAgentTwoEdgeConflictSeparator : public Separator
 
     // Helper data
     Vector<MultiAgentTwoEdgeConstraintCandidate> candidates_;
-    HashMap<AgentTime, UInt8> num_separated_;
+    HashMap<AgentTime, UInt16> num_separated_;
 
   public:
     // Constructors and destructor
@@ -43,18 +43,21 @@ class MultiAgentTwoEdgeConflictSeparator : public Separator
     MultiAgentTwoEdgeConflictSeparator(const Instance& instance, Problem& problem);
 
     // Separator type
-    constexpr static auto name() { return "Multi-agent two-edge"; }
+    constexpr static auto name()
+    {
+        return "Multi-agent two-edge";
+    }
 
     // Separate
     void separate();
 
     // Add dual solution to pricing costs
-    void add_pricing_costs(const Constraint& constraint, const Float dual);
+    static void apply_in_pricer(const Constraint& constraint, const Real64 dual, Pricer& pricer);
 
     // Add coefficient to a column
-    Float get_coeff(const Constraint& constraint, const Agent a, const Path& path);
+    static Real64 get_coeff(const Constraint& constraint, const Agent a, const Path& path);
 
   private:
-    static Float calculate_coeff(const Array<Edge, 3>& es, const Time t, const Path& path);
+    static Real64 calculate_coeff(const Array<Edge, 3>& es, const Time t, const Path& path);
     void create_row(const MultiAgentTwoEdgeConstraintCandidate& candidate);
 };

@@ -5,22 +5,22 @@ Noncommercial License 1.0.0. A copy of this license can found in LICENSE.md.
 Author: Edward Lam <ed@ed-lam.com>
 */
 
-#include <fstream>
 #include "problem/map.h"
 #include "types/string.h"
+#include <fstream>
 
 Map::Map(const FilePath& map_path)
 {
     // Open map file.
     std::ifstream map_file;
     map_file.open(map_path, std::ios::in);
-    release_assert(map_file.good(), "Invalid map file {}", map_path.string());
+    ASSERT(map_file.good(), "Invalid map file {}", map_path.string());
 
     // Read map.
     {
         char buf[1024];
         map_file.getline(buf, 1024);
-        release_assert(strstr(buf, "type octile"), "Invalid map file format");
+        ASSERT(strstr(buf, "type octile"), "Invalid map file format");
     }
 
     // Read map size.
@@ -29,7 +29,7 @@ Map::Map(const FilePath& map_path)
     String param;
     {
         Position value;
-        for (Size i = 0; i < 2; ++i)
+        for (Size64 i = 0; i < 2; ++i)
         {
             map_file >> param >> value;
             if (param == "width")
@@ -42,11 +42,11 @@ Map::Map(const FilePath& map_path)
             }
             else
             {
-                err("Invalid input in map file {}", param);
+                ERROR("Invalid input in map file {}", param);
             }
         }
-        release_assert(height > 0, "Invalid map height {}", height);
-        release_assert(width > 0, "Invalid map width {}", width);
+        ASSERT(height > 0, "Invalid map height {}", height);
+        ASSERT(width > 0, "Invalid map width {}", width);
         height += 2; // Add border.
         width += 2;
     }
@@ -56,16 +56,16 @@ Map::Map(const FilePath& map_path)
 
     // Read grid.
     map_file >> param;
-    release_assert(param == "map", "Invalid map file header");
+    ASSERT(param == "map", "Invalid map file header");
     {
         auto c = static_cast<char>(map_file.get());
-        release_assert(map_file.good(), "Invalid map header");
+        ASSERT(map_file.good(), "Invalid map header");
         if (c == '\r')
         {
             c = static_cast<char>(map_file.get());
-            release_assert(map_file.good(), "Invalid map header");
+            ASSERT(map_file.good(), "Invalid map header");
         }
-        release_assert(c == '\n', "Invalid map header");
+        ASSERT(c == '\n', "Invalid map header");
     }
     Node n = width + 1; // Start reading into the second row, second column of the grid
     while (true)
@@ -90,7 +90,7 @@ Map::Map(const FilePath& map_path)
             case '\r':
                 continue;
             case '.':
-                release_assert(n < size(), "More cells in the map file than its size");
+                ASSERT(n < size(), "More cells in the map file than its size");
                 set_passable(n);
                 [[fallthrough]];
             default:
@@ -99,7 +99,7 @@ Map::Map(const FilePath& map_path)
         }
     }
     n += width + 1; // Should be +2 but already counted a +1 from the previous \n
-    release_assert(n == size(), "Unexpected number of cells");
+    ASSERT(n == size(), "Unexpected number of cells");
 
     // Close file.
     map_file.close();
@@ -107,7 +107,7 @@ Map::Map(const FilePath& map_path)
 
 void Map::resize(const Position width, const Position height)
 {
-    debug_assert(empty());
+    DEBUG_ASSERT(empty());
     passable_.resize(width * height, false);
     width_ = width;
     height_ = height;
@@ -115,13 +115,13 @@ void Map::resize(const Position width, const Position height)
 
 void Map::set_passable(const Node n)
 {
-    debug_assert(n < size());
+    DEBUG_ASSERT(n < size());
     passable_[n] = true;
 }
 
 void Map::set_obstacle(const Node n)
 {
-    debug_assert(n < size());
+    DEBUG_ASSERT(n < size());
     passable_[n] = false;
 }
 

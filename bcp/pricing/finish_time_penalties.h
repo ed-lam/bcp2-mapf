@@ -7,8 +7,8 @@ Author: Edward Lam <ed@ed-lam.com>
 
 #pragma once
 
-#include "problem/debug.h"
 #include "types/basic_types.h"
+#include "types/debug.h"
 #include "types/vector.h"
 
 class FinishTimePenalties
@@ -26,12 +26,21 @@ class FinishTimePenalties
     ~FinishTimePenalties() noexcept = default;
 
     // Getters
-    inline Time size() const { return penalties_.size(); }
-    // auto operator[](const Time t) const { debug_assert(t < penalties_.size()); return penalties_[t]; }
+    inline Time size() const
+    {
+        return penalties_.size();
+    }
 
-    // Get the lower bound (h value) at the current time (assuming the agent is already at the target location)
-    inline Cost get_h(const Time t) const { return t < h_.size() ? h_[t] : 0.0; }
-    inline Cost get_penalty(const Time t) const { return t < penalties_.size() ? penalties_[t] : 0.0; }
+    // Get the lower bound (h value) at the current time (assuming the agent is already at the
+    // target location)
+    inline Cost get_h(const Time t) const
+    {
+        return t < h_.size() ? h_[t] : 0.0;
+    }
+    inline Cost get_penalty(const Time t) const
+    {
+        return t < penalties_.size() ? penalties_[t] : 0.0;
+    }
 
     // Clear
     void clear()
@@ -43,8 +52,8 @@ class FinishTimePenalties
     // Add a finish time penalty for finishing at or before time leq_time
     void add(const Time leq_time, const Cost cost)
     {
-        debug_assert(leq_time >= 0);
-        debug_assert(cost >= 0);
+        DEBUG_ASSERT(leq_time >= 0);
+        DEBUG_ASSERT(cost >= 0);
         if (leq_time + 1 >= size())
         {
             penalties_.resize(leq_time + 1);
@@ -59,7 +68,7 @@ class FinishTimePenalties
     void finalise()
     {
         // Sum up the penalties as a lower bound (h value).
-        debug_assert(h_.empty());
+        DEBUG_ASSERT(h_.empty());
         h_.resize(penalties_.size());
         for (Time t = 0; t < h_.size(); ++t)
         {
@@ -77,12 +86,12 @@ class FinishTimePenalties
     // Print
     void print() const
     {
-        println("Finish time penalties:");
-        println("{:>8s}{:>15s}", "T", "Penalty");
+        PRINTLN("Finish time penalties:");
+        PRINTLN("{:>8s}{:>15s}", "T", "Penalty");
         for (Time t = 0; t < penalties_.size(); ++t)
         {
-            println("{:>8d}{:>15.2f}", t, penalties_[t]);
+            PRINTLN("{:>8d}{:>15.2f}", t, penalties_[t]);
         }
-        println("");
+        PRINTLN("");
     }
 };

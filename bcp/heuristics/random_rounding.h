@@ -33,7 +33,10 @@ class RandomRounding : public PrimalHeuristic
     RandomRounding& operator=(RandomRounding&&) = delete;
 
     // Primal heuristic type
-    constexpr static auto name() { return "Random rounding"; }
+    constexpr static auto name()
+    {
+        return "Random rounding";
+    }
 
     // Run
     Pair<Cost, Vector<Variable*>> execute();

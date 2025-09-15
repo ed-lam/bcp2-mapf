@@ -8,7 +8,7 @@ Author: Edward Lam <ed@ed-lam.com>
 #pragma once
 
 #include "constraints/separator.h"
-#include "master/constraint.h"
+#include "pricing/pricer.h"
 #include "types/matrix.h"
 #include "types/tuple.h"
 #include "types/vector.h"
@@ -18,7 +18,7 @@ class Map;
 
 class CorridorConflictSeparator : public Separator
 {
-    struct CorridorConstraint : public Constraint
+    struct ConstraintData
     {
         Agent a1;
         Agent a2;
@@ -27,7 +27,7 @@ class CorridorConflictSeparator : public Separator
     };
     struct CorridorConstraintCandidate
     {
-        Float lhs;
+        Real64 lhs;
         Agent a1;
         Agent a2;
         NodeTime a1_earliest_arrival;
@@ -37,7 +37,7 @@ class CorridorConflictSeparator : public Separator
     // Helper data
     DistanceHeuristic& distance_heuristic_;
     Vector<CorridorConstraintCandidate> candidates_;
-    Matrix<UInt8> num_separated_;
+    Matrix<UInt16> num_separated_;
 
   public:
     // Constructors and destructor
@@ -45,16 +45,19 @@ class CorridorConflictSeparator : public Separator
     CorridorConflictSeparator(const Instance& instance, Problem& problem);
 
     // Separator type
-    constexpr static auto name() { return "Corridor"; }
+    constexpr static auto name()
+    {
+        return "Corridor";
+    }
 
     // Separate
     void separate();
 
     // Add dual solution to pricing costs
-    void add_pricing_costs(const Constraint& constraint, const Float dual);
+    static void apply_in_pricer(const Constraint& constraint, const Real64 dual, Pricer& pricer);
 
     // Add coefficient to a column
-    Float get_coeff(const Constraint& constraint, const Agent a, const Path& path);
+    static Real64 get_coeff(const Constraint& constraint, const Agent a, const Path& path);
 
   private:
     static Tuple<NodeTime, NodeTime, NodeTime, NodeTime> find_endpoint(const EdgeTime a1_et,

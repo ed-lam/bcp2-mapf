@@ -5,11 +5,14 @@ Noncommercial License 1.0.0. A copy of this license can found in LICENSE.md.
 Author: Edward Lam <ed@ed-lam.com>
 */
 
+#ifdef USE_SHARED_TIME_INTERVAL_ASTAR_PRICER
+
 #pragma once
 
-#include "types/astar_priority_queue.h"
+#include "problem/map.h"
+#include "types/arena.h"
+#include "types/dary_heap.h"
 #include "types/map_types.h"
-#include "types/memory_pool.h"
 
 class DistanceHeuristic;
 class OnceOffPenalties;
@@ -34,8 +37,8 @@ class SharedTimeIntervalAStar
         PriorityQueueSizeType pq_index;
         Byte bitset[];
 
-        static const Size data_size = 8*5 + 2*2 + 4*1;
-        static const Size padding_size = 0;
+        static const Size64 data_size = 8 * 5 + 2 * 2 + 4 * 1;
+        static const Size64 padding_size = 0;
     };
     static_assert(sizeof(FeasibleLabel) == FeasibleLabel::data_size + FeasibleLabel::padding_size);
     struct InfeasibleLabel
@@ -50,13 +53,14 @@ class SharedTimeIntervalAStar
         UInt16 reservations;
         Byte bitset[];
 
-        static const Size data_size = 8*4 + 4*1 + 2*3;
-        static const Size padding_size = 6;
+        static const Size64 data_size = 8 * 4 + 4 * 1 + 2 * 3;
+        static const Size64 padding_size = 6;
     };
-    static_assert(sizeof(InfeasibleLabel) == InfeasibleLabel::data_size + InfeasibleLabel::padding_size);
+    static_assert(sizeof(InfeasibleLabel) ==
+                  InfeasibleLabel::data_size + InfeasibleLabel::padding_size);
 
     // Priority queue data structures
-    template<Bool feasible>
+    template <Bool feasible>
     using Label = typename std::conditional<feasible, FeasibleLabel, InfeasibleLabel>::type;
     struct LabelComparison
     {
@@ -92,8 +96,8 @@ class SharedTimeIntervalAStar
                    std::tie(rhs->g, rhs->time_f, rhs->reservations, lhs->nt.t);
         }
     };
-    template<class Label>
-    class PriorityQueue : public AStarPriorityQueue<Label*, LabelComparison, PriorityQueueSizeType>
+    template <class Label>
+    class PriorityQueue : public DAryHeap<Label*, LabelComparison, PriorityQueueSizeType>
     {
       public:
         // Modify the handle in the label pointing to its position in the priority queue
@@ -123,7 +127,7 @@ class SharedTimeIntervalAStar
     // Branching decisions
     Vector<NodeTime>* waypoints_;
     Vector<Time> h_waypoint_to_target_;
-    Size next_waypoint_index_;
+    Size64 next_waypoint_index_;
     Time waypoint_time_;
     const Time* h_to_waypoint_;
 
@@ -132,33 +136,31 @@ class SharedTimeIntervalAStar
     const SharedIntervals* intervals_;
     OnceOffPenalties* once_off_penalties_;
     RectanglePenalties* rectangle_penalties_;
-    Size once_off_bitset_size_;
-    Size rectangle_bitset_size_;
+    Size64 once_off_bitset_size_;
+    Size64 rectangle_bitset_size_;
     Time earliest_target_time_;
     Time latest_target_time_;
 
     // Solver state
-    MemoryPool label_storage_;
+    Arena label_storage_;
     void** closed_;
     PriorityQueue<InfeasibleLabel> open_infeasible_;
     PriorityQueue<FeasibleLabel> open_feasible_;
     Cost obj_;
 #ifdef USE_SHARED_TIME_INTERVAL_ASTAR_PRICER
-    Size& num_added_;
+    Size64& num_added_;
 #endif
 
     // Debug
-// #ifdef CHECK_USING_ASTAR
-//     TimeExpandedAStar<feasible> astar_;
-// #endif
+    // #ifdef CHECK_USING_ASTAR
+    //     TimeExpandedAStar<feasible> astar_;
+    // #endif
 
   public:
     // Constructors and destructor
     SharedTimeIntervalAStar() = delete;
-    SharedTimeIntervalAStar(const Instance& instance,
-                            Problem& problem,
-                            DistanceHeuristic& distance_heuristic,
-                            Size& num_added);
+    SharedTimeIntervalAStar(const Instance& instance, Problem& problem,
+                            DistanceHeuristic& distance_heuristic, Size64& num_added);
     ~SharedTimeIntervalAStar();
     SharedTimeIntervalAStar(const SharedTimeIntervalAStar&) noexcept = delete;
     SharedTimeIntervalAStar(SharedTimeIntervalAStar&&) noexcept = default;
@@ -166,12 +168,9 @@ class SharedTimeIntervalAStar
     SharedTimeIntervalAStar& operator=(SharedTimeIntervalAStar&&) noexcept = delete;
 
     // Solve
-    template<Bool feasible>
-    Cost solve(const Agent a,
-               Vector<NodeTime>& waypoints,
-               const Float constant,
-               const SharedIntervals& intervals,
-               OnceOffPenalties& once_off_penalties,
+    template <Bool feasible>
+    Cost solve(const Agent a, Vector<NodeTime>& waypoints, const Real64 constant,
+               const SharedIntervals& intervals, OnceOffPenalties& once_off_penalties,
                RectanglePenalties& rectangle_penalties);
 
     // Debug
@@ -184,42 +183,59 @@ class SharedTimeIntervalAStar
     void reset();
 
     // Constants
-    constexpr static inline Node end_n() { return -1; }
-    constexpr static inline Bool is_end(const NodeTime nt) { return nt.n == end_n(); }
-    template<Bool feasible>
-    constexpr static inline Time default_edge_cost() { return static_cast<Time>(feasible); }
+    constexpr static inline Node end_n()
+    {
+        return -1;
+    }
+    constexpr static inline Bool is_end(const NodeTime nt)
+    {
+        return nt.n == end_n();
+    }
+    template <Bool feasible>
+    constexpr static inline Time default_edge_cost()
+    {
+        return static_cast<Time>(feasible);
+    }
 
     // State generation
-    template<Bool feasible>
+    template <Bool feasible>
     Byte* get_once_off_bitset(Label<feasible>* const label);
-    template<Bool feasible>
+    template <Bool feasible>
     Byte* get_rectangle_bitset(Label<feasible>* const label);
 #ifdef USE_RESERVATION_LOOKUP
     Bool calculate_reservation(const NodeTime nt);
 #endif
-    template<Bool feasible, Bool towards_end>
+    template <Bool feasible, Bool towards_end>
     void generate_start();
-    template<Bool feasible, Bool towards_end>
+    template <Bool feasible, Bool towards_end>
     void generate_nodetimes(const Node next_n, const Direction d, Label<feasible>* current);
-    template<Bool feasible, Bool towards_end>
+    template <Bool feasible, Bool towards_end>
     void generate_waypoint(Label<feasible>* current);
-    template<Bool feasible>
+    template <Bool feasible>
     void generate_end(Label<feasible>* current);
-    template<Bool feasible, Bool towards_end>
+    template <Bool feasible, Bool towards_end>
     void expand(Label<feasible>* current);
-    template<Bool feasible>
+    template <Bool feasible>
     void add_path(Label<feasible>* end);
 
     // Queue functions
-    template<Bool feasible>
+    template <Bool feasible>
     constexpr inline auto& open()
     {
-        if constexpr (feasible) { return open_feasible_; }
-        else { return open_infeasible_; }
+        if constexpr (feasible)
+        {
+            return open_feasible_;
+        }
+        else
+        {
+            return open_infeasible_;
+        }
     }
-    template<Bool feasible, Bool is_wait_action>
+    template <Bool feasible, Bool is_wait_action>
     Label<feasible>* push(Label<feasible>* next);
 
     // Debug
     // String format_label(const Label* const label) const;
 };
+
+#endif

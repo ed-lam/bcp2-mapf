@@ -17,7 +17,7 @@ class SimpleRounding : public PrimalHeuristic
 {
     struct CandidatePath
     {
-        Float random;
+        Real64 random;
         UInt32 rounded_val;
         Agent a;
         Variable* variable_ptr;
@@ -42,7 +42,10 @@ class SimpleRounding : public PrimalHeuristic
     SimpleRounding& operator=(SimpleRounding&&) = delete;
 
     // Primal heuristic type
-    constexpr static auto name() { return "Simple rounding"; }
+    constexpr static auto name()
+    {
+        return "Simple rounding";
+    }
 
     // Run
     Pair<Cost, Vector<Variable*>> execute();

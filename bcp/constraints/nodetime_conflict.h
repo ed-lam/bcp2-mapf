@@ -14,14 +14,14 @@ Author: Edward Lam <ed@ed-lam.com>
 
 class NodeTimeConflictSeparator : public Separator
 {
-    struct NodeTimeConstraint : public Constraint
+    struct ConstraintData
     {
         NodeTime nt;
     };
     struct NodeTimeConstraintCandidate
     {
-        Float lhs;
-        Float random;
+        Real64 lhs;
+        Real64 random;
         NodeTime nt;
     };
 
@@ -36,16 +36,19 @@ class NodeTimeConflictSeparator : public Separator
     NodeTimeConflictSeparator(const Instance& instance, Problem& problem);
 
     // Separator type
-    constexpr static auto name() { return "Node-time"; }
+    constexpr static auto name()
+    {
+        return "Node-time";
+    }
 
     // Separate
     void separate();
 
     // Add dual solution to pricing costs
-    void add_pricing_costs(const Constraint& constraint, const Float dual);
+    static void apply_in_pricer(const Constraint& constraint, const Real64 dual, Pricer& pricer);
 
     // Add coefficient to a column
-    Float get_coeff(const Constraint& constraint, const Agent a, const Path& path);
+    static Real64 get_coeff(const Constraint& constraint, const Agent a, const Path& path);
 
   private:
     static Bool calculate_coeff(const NodeTime nt, const Path& path);
