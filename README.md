@@ -19,8 +19,6 @@ BCP2-MAPF is implemented in C++23 and is built using CMake, so you will need a r
 
 BCP2-MAPF calls Gurobi for solving the linear relaxation. Gurobi is commercial software but provides free binaries under an academic license. BCP2-MAPF is tested with Gurobi 11 and 12.
 
-It also requires Boost and a few other header-only libraries. These are automatically downloaded by CMake or Git using the instructions below.
-
 Compiling
 ---------
 
@@ -28,9 +26,9 @@ Compiling
 
 2. Obtain an [academic license](https://www.gurobi.com/features/academic-named-user-license/) for Gurobi.
 
-3. Download the source code to BCP2-MAPF by cloning this repository and all its submodules:
+3. Download the source code to BCP2-MAPF by cloning this repository:
 ```
-git clone --recurse-submodules https://github.com/ed-lam/bcp2-mapf.git
+git clone https://github.com/ed-lam/bcp2-mapf.git
 cd bcp2-mapf
 ```
 
