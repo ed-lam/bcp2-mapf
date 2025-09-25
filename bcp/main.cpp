@@ -49,12 +49,14 @@ int main(int argc, char** argv)
         if (result.count("agent-limit"))
         {
             agent_limit = result["agent-limit"].as<Agent>();
+            ASSERT(agent_limit >= 1, "Entered {} agents but must have at least 1", agent_limit);
         }
 
         // Get the time limit.
         if (result.count("time-limit"))
         {
             time_limit = result["time-limit"].as<Real64>();
+            ASSERT(time_limit > 0, "Entered time limit of {} but must be positive", time_limit);
         }
     }
     catch (const cxxopts::exceptions::exception& e)
