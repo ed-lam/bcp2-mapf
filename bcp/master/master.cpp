@@ -44,7 +44,7 @@ MasterProblem::MasterProblem(const Instance& instance, Problem& problem) :
     subset_constraints_(),
     agent_constraints_(nullptr),
 
-    disable_cols_()
+    temp_buffer_()
 {
     ZoneScopedC(TRACY_COLOUR);
 
@@ -463,21 +463,6 @@ void MasterProblem::solve()
     // Start timer.
     auto timer = clock_.start_timer();
 
-    // Disable variables removed by branching.
-    if (!disable_cols_.empty())
-    {
-        // Remove duplicate columns that are marked for disabling.
-        std::sort(disable_cols_.begin(), disable_cols_.end());
-        auto last = std::unique(disable_cols_.begin(), disable_cols_.end());
-        disable_cols_.erase(last, disable_cols_.end());
-
-        // Disable the columns.
-        lp_.disable_columns(disable_cols_);
-
-        // Clear.
-        disable_cols_.clear();
-    }
-
     // Write model to file.
     // lp_.write();
 
@@ -551,7 +536,7 @@ void MasterProblem::start_node(BBNode& bbnode)
     // Reset status.
     status_ = MasterProblemStatus::Unknown;
 
-    // Enable all variables.
+    // Set domain upper bounds of all variables to infinity.
     lp_.enable_columns();
 
     // Add back variables and constraints that were previously deleted.
@@ -577,146 +562,179 @@ void MasterProblem::start_node(BBNode& bbnode)
         constraint.activity_ = std::max(constraint.activity_, 1.0);
         DEBUG_ASSERT(constraint.activity() >= DELETE_ROW_MIN_ACTIVITY);
     }
+
+    // Update the LP.
     lp_.update();
 
-    // Check for duplicate constraints.
+    // Delete variables with low activity.
 #ifdef DEBUG
-    for (Size64 i = 0; i < all_constraints_.size(); ++i)
-    {
-        ASSERT(all_constraints_[i]->row() >= i);
-    }
+    Size64 num_cols_deleted = 0;
 #endif
-
-    // Delete variables and constraints with low activity.
-    Vector<ColumnIndex> delete_cols;
-    Vector<RowIndex> delete_rows;
-    for (auto it = all_variables_.begin(); it != all_variables_.end();)
     {
-        // Get the variable data.
-        auto& variable_ptr = *it;
-        auto& variable = *variable_ptr;
-        const auto activity = variable.activity();
-        DEBUG_ASSERT(fmt::format("x({})", variable.id()) == lp_.col_name(variable.col()));
-
-        // Delete if the variable has been inactive for a while.
-        if (activity < DELETE_COLUMN_MIN_ACTIVITY)
+        auto& delete_cols = temp_buffer_;
+        DEBUG_ASSERT(delete_cols.empty());
+        Size64 write = 0;
+        for (Size64 read = 0; read < all_variables_.size(); ++read)
         {
-            delete_cols.push_back(variable.col());
-            variable.col_ = -1;
-            it = all_variables_.erase(it);
-        }
-        else
-        {
-            // Shift the index by however many columns were deleted.
-            variable.col_ -= delete_cols.size();
-            DEBUG_ASSERT(variable.col() == it - all_variables_.begin());
+            // Get the variable data.
+            auto& variable = *all_variables_[read];
+            const auto activity = variable.activity();
+            DEBUG_ASSERT(fmt::format("x({})", variable.id()) == lp_.col_name(variable.col()));
 
-            // Advance to the next variable.
-            ++it;
+            // Delete if the variable has been inactive for a while.
+            if (activity < DELETE_COLUMN_MIN_ACTIVITY)
+            {
+                delete_cols.push_back(variable.col());
+                variable.col_ = -1;
+                continue;
+            }
+
+            // Move the kept variable to the write slot. Update its self-index.
+            all_variables_[write] = all_variables_[read];
+            all_variables_[write]->col_ = write;
+
+            // Advance the write index.
+            ++write;
         }
+#ifdef DEBUG
+        num_cols_deleted = delete_cols.size();
+#endif
+        all_variables_.erase(all_variables_.begin() + write, all_variables_.end());
+        lp_.delete_columns(delete_cols);
+        delete_cols.clear();
     }
-    for (auto it = all_constraints_.begin(); it != all_constraints_.end();)
+
+    // Delete constraints with low activity.
     {
-        // Get the constraint data.
-        auto& constraint_ptr = *it;
-        auto& constraint = *constraint_ptr;
-        const auto activity = constraint.activity();
-        DEBUG_ASSERT(constraint.name() == lp_.row_name(constraint.row()));
-
-        // Delete if the constraint has been inactive for a while.
-        if (activity < DELETE_ROW_MIN_ACTIVITY)
+        auto& delete_rows = temp_buffer_;
+        DEBUG_ASSERT(delete_rows.empty());
+        Size64 write = 0;
+        for (Size64 read = 0; read < all_constraints_.size(); ++read)
         {
-            delete_rows.push_back(constraint.row());
-            constraint.row_ = -1;
-            it = all_constraints_.erase(it);
-        }
-        else
-        {
-            // Shift the index by however many rows were deleted.
-            constraint.row_ -= delete_rows.size();
-            DEBUG_ASSERT(constraint.row() == it - all_constraints_.begin());
+            // Get the constraint data.
+            auto& constraint = *all_constraints_[read];
+            const auto activity = constraint.activity();
+            DEBUG_ASSERT(constraint.name() == lp_.row_name(constraint.row()));
 
-            // Advance to the next constraint.
-            ++it;
+            // Delete if the constraint has been inactive for a while.
+            if (activity < DELETE_ROW_MIN_ACTIVITY)
+            {
+                delete_rows.push_back(constraint.row());
+                constraint.row_ = -1;
+                continue;
+            }
+
+            // Move the kept constraint to the write slot. Update its self-index.
+            all_constraints_[write] = all_constraints_[read];
+            all_constraints_[write]->row_ = write;
+
+            // Advance the write index.
+            ++write;
         }
+        all_constraints_.erase(all_constraints_.begin() + write, all_constraints_.end());
+        lp_.delete_rows(delete_rows);
+        delete_rows.clear();
     }
-    lp_.delete_columns(delete_cols);
-    lp_.delete_rows(delete_rows);
+
+    // Update the LP.
     lp_.update();
-    // PRINTLN("Deleted {} columns and {} rows", delete_cols.size(), delete_rows.size());
 
-    // Check for duplicate constraints.
-#ifdef DEBUG
-    for (Size64 i = 0; i < all_constraints_.size(); ++i)
+    // Clean up.
     {
-        ASSERT(all_constraints_[i]->row() >= i);
-    }
-#endif
-
-    // Clean up pointers to deleted variables.
+        // Clean up pointers to deleted variables.
 #ifdef DEBUG
-    Size64 check_num_cols_deleted = 0;
+        Size64 check_num_cols_deleted = 0;
 #endif
-    for (auto& variables_set : secondary_variables_storage())
-        for (Size64 index = 0; index < variables_set.size();)
+        for (auto& variables_set : secondary_variables_storage())
+            for (Size64 index = 0; index < variables_set.size();)
+            {
+                auto& variable_ptr = variables_set[index];
+                const auto& variable = *variable_ptr;
+                if (variable.col() < 0)
+                {
+                    std::swap(variable_ptr, variables_set.back());
+                    variables_set.pop_back();
+#ifdef DEBUG
+                    ++check_num_cols_deleted;
+#endif
+                }
+                else
+                {
+                    ++index;
+                }
+            }
+        DEBUG_ASSERT(check_num_cols_deleted == num_cols_deleted);
+
+        // Clean up pointers to deleted constraints.
+        for (auto& constraints_set : secondary_constraints_storage())
+            for (Size64 index = 0; index < constraints_set.size();)
+            {
+                auto& constraint_ptr = constraints_set[index];
+                const auto& constraint = *constraint_ptr;
+                if (constraint.row() < 0)
+                {
+                    std::swap(constraint_ptr, constraints_set.back());
+                    constraints_set.pop_back();
+                }
+                else
+                {
+                    ++index;
+                }
+            }
+    }
+
+    // Set up the basis.
+    {
+        // Input the basis to the LP.
+        Vector<ColumnBasis> variable_basis(lp_.num_cols(), DEFAULT_COLUMN_BASIS);
+        Vector<RowBasis> constraint_basis(lp_.num_rows(), DEFAULT_ROW_BASIS);
+        for (const auto& [variable_ptr, basis] : bbnode.variables)
         {
-            auto& variable_ptr = variables_set[index];
             const auto& variable = *variable_ptr;
-            if (variable.col() < 0)
-            {
-                std::swap(variable_ptr, variables_set.back());
-                variables_set.pop_back();
-#ifdef DEBUG
-                ++check_num_cols_deleted;
-#endif
-            }
-            else
-            {
-                ++index;
-            }
+            const auto col = variable.col();
+            DEBUG_ASSERT(0 <= col && col < variable_basis.size());
+            variable_basis[col] = basis;
         }
-    DEBUG_ASSERT(check_num_cols_deleted == delete_cols.size());
-
-    // Clean up pointers to deleted constraints.
-    for (auto& constraints_set : secondary_constraints_storage())
-        for (Size64 index = 0; index < constraints_set.size();)
+        for (const auto& [constraint_ptr, basis] : bbnode.constraints)
         {
-            auto& constraint_ptr = constraints_set[index];
             const auto& constraint = *constraint_ptr;
-            if (constraint.row() < 0)
-            {
-                std::swap(constraint_ptr, constraints_set.back());
-                constraints_set.pop_back();
-            }
-            else
-            {
-                ++index;
-            }
+            const auto row = constraint.row();
+            DEBUG_ASSERT(0 <= row && row < constraint_basis.size());
+            constraint_basis[row] = basis;
+        }
+        bbnode.variables.clear();
+        bbnode.constraints.clear();
+        lp_.set_col_basis(variable_basis);
+        lp_.set_row_basis(constraint_basis);
+    }
+
+    // Disable variables incompatible with branching decisions.
+    {
+        // Get the variables.
+        auto& disable_cols = temp_buffer_;
+        DEBUG_ASSERT(disable_cols.empty());
+        for (auto node = &bbnode; node && node->brancher; node = node->parent.get())
+        {
+            const auto brancher = node->brancher;
+            const auto decision = node->decision.get();
+            brancher->disable_vars(decision);
         }
 
-    // Input the basis to the LP model.
-    Vector<ColumnBasis> variable_basis(lp_.num_cols(), DEFAULT_COLUMN_BASIS);
-    Vector<RowBasis> constraint_basis(lp_.num_rows(), DEFAULT_ROW_BASIS);
-    for (const auto& [variable_ptr, basis] : bbnode.variables)
-    {
-        const auto& variable = *variable_ptr;
-        const auto col = variable.col();
-        DEBUG_ASSERT(0 <= col && col < variable_basis.size());
-        variable_basis[col] = basis;
-    }
-    for (const auto& [constraint_ptr, basis] : bbnode.constraints)
-    {
-        const auto& constraint = *constraint_ptr;
-        const auto row = constraint.row();
-        DEBUG_ASSERT(0 <= row && row < constraint_basis.size());
-        constraint_basis[row] = basis;
-    }
-    bbnode.variables.clear();
-    bbnode.constraints.clear();
+        // Disable the variables.
+        if (!disable_cols.empty())
+        {
+            // Remove duplicates.
+            std::sort(disable_cols.begin(), disable_cols.end());
+            auto last = std::unique(disable_cols.begin(), disable_cols.end());
+            disable_cols.erase(last, disable_cols.end());
 
-    // Set the basis in the LP solver.
-    lp_.set_col_basis(variable_basis);
-    lp_.set_row_basis(constraint_basis);
+            // Disable the columns.
+            lp_.disable_columns(disable_cols);
+
+            // Clear.
+            disable_cols.clear();
+        }
+    }
 }
 
 void MasterProblem::disable_variable(const Variable& variable)
@@ -724,7 +742,7 @@ void MasterProblem::disable_variable(const Variable& variable)
     ZoneScopedC(TRACY_COLOUR);
 
     // Store the variable to disable.
-    disable_cols_.push_back(variable.col());
+    temp_buffer_.push_back(variable.col());
     ++constrs_added_;
 }
 

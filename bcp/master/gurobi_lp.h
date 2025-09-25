@@ -17,6 +17,7 @@ using Sign = char;
 using Value = double;
 using ColumnIndex = int;
 using RowIndex = int;
+using RowOrColumnIndex = int;
 using ColumnBasis = int;
 using RowBasis = int;
 

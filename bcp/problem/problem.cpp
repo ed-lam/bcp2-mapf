@@ -134,14 +134,8 @@ void Problem::solve(const Real64 time_limit)
                     bbtree_.current_lb(),
                     bbtree_.current_parent_id());
 
-            // Start the node.
+            // Set up the basis and disable variables incompatible with branching decisions.
             master_.start_node(bbtree_.current());
-
-            // Disable variables removed by branching.
-            for (const auto& [brancher, decision] : bbtree_.all_decisions())
-            {
-                brancher->disable_vars(decision);
-            }
 
             // Reset history of objective value to check for stalled LP.
             std::fill(master_obj_history_.begin(), master_obj_history_.end(), COST_NAN);

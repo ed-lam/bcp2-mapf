@@ -39,18 +39,18 @@ class MasterProblem
 
     // Variables
     VariableStorage variable_storage_;
-    Vector<Variable*> all_variables_;
+    Vector<Variable*> all_variables_; // Ordered in LP solver
     Vector<Variable*>* agent_variables_;
 
     // Constraints
     ConstraintStorage constraint_storage_;
-    Vector<Constraint*> all_constraints_;
+    Vector<Constraint*> all_constraints_; // Ordered in LP solver
     Vector<Constraint*> universal_constraints_;
     Vector<Constraint*> subset_constraints_;
     Vector<Constraint*>* agent_constraints_;
 
     // Temporary buffers
-    Vector<ColumnIndex> disable_cols_;
+    Vector<RowOrColumnIndex> temp_buffer_;
 
   public:
     // Constructors and destructor
