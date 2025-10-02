@@ -14,17 +14,15 @@ Author: Edward Lam <ed@ed-lam.com>
 
 struct Chunk
 {
-    static constexpr Size64 chunk_size = 1'048'576; // 1 MiB
+    static constexpr Size64 chunk_size = 1024 * 1024; // 1 MiB
 
-    UniquePtr<Byte> mem;
+    UniquePtr<Byte[]> mem;
     UniquePtr<Chunk> next;
 
     Chunk() :
-        mem(static_cast<Byte*>(
-            ::operator new(chunk_size, std::align_val_t(alignof(std::max_align_t))))),
+        mem(std::make_unique_for_overwrite<Byte[]>(chunk_size)), // Throws if failure
         next()
     {
-        ASSERT(mem, "Failed to allocate chunk of memory in arena");
     }
     ~Chunk() = default;
     Chunk(const Chunk&) = delete;
