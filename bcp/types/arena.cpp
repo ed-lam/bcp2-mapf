@@ -47,8 +47,6 @@ void Arena::reset(const Size64 object_size)
     object_size_ = ((object_size + 7) & (-8)); // Round up to next multiple of 8
 }
 
-int iter = 0;
-
 template <Bool commit, Bool zero_out>
 Byte* Arena::get_buffer()
 {
